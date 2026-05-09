@@ -4,6 +4,8 @@ import {
   Activity,
   AlertTriangle,
   Braces,
+  ChevronLeft,
+  ChevronRight,
   Clipboard,
   Database,
   FileDown,
@@ -34,6 +36,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isSchemaOpen, setIsSchemaOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
 
   useEffect(() => {
     loadHealth();
@@ -116,8 +120,17 @@ function App() {
         </div>
       </nav>
 
-      <main className="workbench">
-        <SchemaPanel schema={schema} onRefresh={loadSchema} />
+      <main
+        className={`workbench ${isSchemaOpen ? "" : "schema-collapsed"} ${
+          isHistoryOpen ? "" : "history-collapsed"
+        }`}
+      >
+        <SchemaPanel
+          schema={schema}
+          onRefresh={loadSchema}
+          isOpen={isSchemaOpen}
+          onToggle={() => setIsSchemaOpen((value) => !value)}
+        />
 
         <section className="data-canvas">
           <div className="canvas-inner">
@@ -175,6 +188,8 @@ function App() {
           records={history}
           onRefresh={loadHistory}
           onSelect={(record) => setQuestion(record.question)}
+          isOpen={isHistoryOpen}
+          onToggle={() => setIsHistoryOpen((value) => !value)}
         />
       </main>
     </div>
@@ -316,74 +331,111 @@ function ResultsTable({ rows, rowCount }) {
   );
 }
 
-function SchemaPanel({ schema, onRefresh }) {
+function SchemaPanel({ schema, onRefresh, isOpen, onToggle }) {
   const tableCount = Object.keys(schema).length;
 
   return (
-    <aside className="schema-rail">
-      <div className="panel-title">
-        <h2>
-          <Database size={18} />
-          Schema Explorer
-        </h2>
-        <button type="button" className="tool-button" onClick={onRefresh} title="Refresh schema">
-          <RefreshCw size={16} />
-        </button>
-      </div>
-      <div className="rail-summary">
-        <strong>{tableCount}</strong>
-        <span>tables indexed</span>
-      </div>
-      <div className="schema-stack">
-        {Object.entries(schema).map(([table, columns]) => (
-          <details key={table} open={["students", "courses"].includes(table)}>
-            <summary>
-              <span>{table}</span>
-              <em>{columns.length}</em>
-            </summary>
-            <div className="column-list">
-              {columns.map((column) => (
-                <span key={column.name}>
-                  {column.name} <em>{column.type}</em>
-                </span>
-              ))}
-            </div>
-          </details>
-        ))}
+    <aside className={`schema-rail ${isOpen ? "" : "is-collapsed"}`}>
+      <CollapsedRailButton
+        icon={<Database size={18} />}
+        label="Open schema"
+        isVisible={!isOpen}
+        onClick={onToggle}
+      />
+      <div className="rail-content" aria-hidden={!isOpen}>
+        <div className="panel-title">
+          <h2>
+            <Database size={18} />
+            Schema Explorer
+          </h2>
+          <div className="panel-actions">
+            <button type="button" className="tool-button" onClick={onRefresh} title="Refresh schema">
+              <RefreshCw size={16} />
+            </button>
+            <button type="button" className="tool-button" onClick={onToggle} title="Close schema">
+              <ChevronLeft size={17} />
+            </button>
+          </div>
+        </div>
+        <div className="rail-summary">
+          <strong>{tableCount}</strong>
+          <span>tables indexed</span>
+        </div>
+        <div className="schema-stack">
+          {Object.entries(schema).map(([table, columns]) => (
+            <details key={table} open={["students", "courses"].includes(table)}>
+              <summary>
+                <span>{table}</span>
+                <em>{columns.length}</em>
+              </summary>
+              <div className="column-list">
+                {columns.map((column) => (
+                  <span key={column.name}>
+                    {column.name} <em>{column.type}</em>
+                  </span>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
       </div>
     </aside>
   );
 }
 
-function HistoryPanel({ records, onRefresh, onSelect }) {
+function HistoryPanel({ records, onRefresh, onSelect, isOpen, onToggle }) {
   return (
-    <aside className="history-rail">
-      <div className="panel-title">
-        <h2>
-          <History size={18} />
-          History
-        </h2>
-        <button type="button" className="tool-button" onClick={onRefresh} title="Refresh history">
-          <RefreshCw size={16} />
-        </button>
-      </div>
-      <div className="rail-summary">
-        <strong>{records.length}</strong>
-        <span>recent runs</span>
-      </div>
-      <div className="history-stack">
-        {records.length ? (
-          records.map((record) => (
-            <button key={record.id} type="button" onClick={() => onSelect(record)}>
-              <strong>{record.question}</strong>
-              <span>{record.execution_status} / click to rerun</span>
+    <aside className={`history-rail ${isOpen ? "" : "is-collapsed"}`}>
+      <CollapsedRailButton
+        icon={<History size={18} />}
+        label="Open history"
+        isVisible={!isOpen}
+        onClick={onToggle}
+      />
+      <div className="rail-content" aria-hidden={!isOpen}>
+        <div className="panel-title">
+          <h2>
+            <History size={18} />
+            History
+          </h2>
+          <div className="panel-actions">
+            <button type="button" className="tool-button" onClick={onRefresh} title="Refresh history">
+              <RefreshCw size={16} />
             </button>
-          ))
-        ) : (
-          <p className="empty-state compact">No saved queries yet.</p>
-        )}
+            <button type="button" className="tool-button" onClick={onToggle} title="Close history">
+              <ChevronRight size={17} />
+            </button>
+          </div>
+        </div>
+        <div className="rail-summary">
+          <strong>{records.length}</strong>
+          <span>recent runs</span>
+        </div>
+        <div className="history-stack">
+          {records.length ? (
+            records.map((record) => (
+              <button key={record.id} type="button" onClick={() => onSelect(record)}>
+                <strong>{record.question}</strong>
+                <span>{record.execution_status} / click to rerun</span>
+              </button>
+            ))
+          ) : (
+            <p className="empty-state compact">No saved queries yet.</p>
+          )}
+        </div>
       </div>
     </aside>
+  );
+}
+
+function CollapsedRailButton({ icon, label, isVisible, onClick }) {
+  if (!isVisible) return null;
+
+  return (
+    <button type="button" className="collapsed-rail-button" onClick={onClick} title={label} aria-label={label}>
+      {icon}
+      <span>{label.replace("Open ", "")}</span>
+    </button>
   );
 }
 
