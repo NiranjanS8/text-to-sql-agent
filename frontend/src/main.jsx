@@ -28,6 +28,77 @@ const sampleQuestions = [
   "Which students are enrolled in more than one course?",
 ];
 
+const schemaRelationships = [
+  ["students", "enrollments", "id -> student_id"],
+  ["courses", "enrollments", "id -> course_id"],
+  ["enrollments", "payments", "id -> enrollment_id"],
+  ["organizations", "app_users", "id -> organization_id"],
+  ["organizations", "subscriptions", "id -> organization_id"],
+  ["plans", "subscriptions", "id -> plan_id"],
+  ["subscriptions", "invoices", "id -> subscription_id"],
+  ["organizations", "usage_events", "id -> organization_id"],
+  ["app_users", "usage_events", "id -> user_id"],
+  ["organizations", "support_tickets", "id -> organization_id"],
+  ["app_users", "support_tickets", "id -> opened_by_user_id"],
+  ["organizations", "feature_adoption", "id -> organization_id"],
+  ["feature_flags", "feature_adoption", "id -> feature_flag_id"],
+];
+
+const schemaNodeLayout = {
+  students: { x: 24, y: 64 },
+  courses: { x: 24, y: 176 },
+  enrollments: { x: 250, y: 120 },
+  payments: { x: 476, y: 120 },
+  organizations: { x: 24, y: 356 },
+  app_users: { x: 250, y: 292 },
+  plans: { x: 250, y: 404 },
+  subscriptions: { x: 476, y: 356 },
+  invoices: { x: 476, y: 468 },
+  usage_events: { x: 250, y: 548 },
+  support_tickets: { x: 476, y: 580 },
+  feature_flags: { x: 24, y: 628 },
+  feature_adoption: { x: 250, y: 660 },
+  query_history: { x: 476, y: 700 },
+};
+
+const schemaDomains = [
+  { id: "all", label: "All", tables: [] },
+  { id: "education", label: "Education", tables: ["students", "courses", "enrollments", "payments"] },
+  {
+    id: "saas",
+    label: "SaaS",
+    tables: [
+      "organizations",
+      "app_users",
+      "plans",
+      "subscriptions",
+      "invoices",
+      "usage_events",
+      "support_tickets",
+      "feature_flags",
+      "feature_adoption",
+    ],
+  },
+  { id: "system", label: "System", tables: ["query_history"] },
+];
+
+const tableDescriptions = {
+  students: "Education learners with city and join date metadata.",
+  courses: "Course catalog with category and fee.",
+  enrollments: "Bridge table connecting students to courses.",
+  payments: "Education payments linked to enrollments.",
+  organizations: "SaaS customer accounts with region, industry, and lifecycle.",
+  app_users: "Users inside SaaS customer organizations.",
+  plans: "Pricing plans with seats and included usage.",
+  subscriptions: "Active, trialing, and past-due customer subscriptions.",
+  invoices: "Monthly SaaS invoice amounts, balances, and payment status.",
+  usage_events: "Aggregated product usage events by account and user.",
+  support_tickets: "Customer support cases by priority and lifecycle.",
+  feature_flags: "Product capabilities available for rollout/adoption.",
+  feature_adoption: "Per-organization feature usage and adoption strength.",
+  query_history: "Saved agent runs and execution status.",
+};
+
 function App() {
   const [question, setQuestion] = useState(sampleQuestions[0]);
   const [schema, setSchema] = useState({});
@@ -38,7 +109,7 @@ function App() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [isSchemaOpen, setIsSchemaOpen] = useState(true);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [requireApproval, setRequireApproval] = useState(false);
 
   useEffect(() => {
@@ -421,6 +492,15 @@ function ResultsTable({ rows, rowCount }) {
 
 function SchemaPanel({ schema, onRefresh, isOpen, onToggle }) {
   const tableCount = Object.keys(schema).length;
+  const [activeDomain, setActiveDomain] = useState("all");
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [diagramMode, setDiagramMode] = useState("visual");
+  const activeDomainConfig = schemaDomains.find((domain) => domain.id === activeDomain) || schemaDomains[0];
+  const visibleTables = Object.entries(schema).filter(
+    ([table]) => activeDomain === "all" || activeDomainConfig.tables.includes(table),
+  );
+  const visibleSchema = Object.fromEntries(visibleTables);
+  const selectedColumns = selectedTable ? schema[selectedTable] || [] : [];
 
   return (
     <aside className={`schema-rail ${isOpen ? "" : "is-collapsed"}`}>
@@ -449,17 +529,44 @@ function SchemaPanel({ schema, onRefresh, isOpen, onToggle }) {
           <strong>{tableCount}</strong>
           <span>tables indexed</span>
         </div>
+        <div className="schema-tabs" role="tablist" aria-label="Schema domains">
+          {schemaDomains.map((domain) => (
+            <button
+              key={domain.id}
+              type="button"
+              className={activeDomain === domain.id ? "active" : ""}
+              onClick={() => {
+                setActiveDomain(domain.id);
+                setSelectedTable(null);
+              }}
+            >
+              {domain.label}
+            </button>
+          ))}
+        </div>
+        <SchemaMermaidDiagram
+          schema={visibleSchema}
+          mode={diagramMode}
+          onModeChange={setDiagramMode}
+          selectedTable={selectedTable}
+          onSelectTable={setSelectedTable}
+        />
+        <TableDetailDrawer table={selectedTable} columns={selectedColumns} onClose={() => setSelectedTable(null)} />
         <div className="schema-stack">
-          {Object.entries(schema).map(([table, columns]) => (
-            <details key={table} open={["students", "courses"].includes(table)}>
+          {visibleTables.map(([table, columns]) => (
+            <details key={table} open={selectedTable === table || ["students", "courses"].includes(table)}>
               <summary>
-                <span>{table}</span>
+                <button type="button" onClick={() => setSelectedTable(table)}>
+                  {table}
+                </button>
                 <em>{columns.length}</em>
               </summary>
               <div className="column-list">
                 {columns.map((column) => (
-                  <span key={column.name}>
-                    {column.name} <em>{column.type}</em>
+                  <span key={column.name} className="column-item">
+                    <strong>{column.name}</strong>
+                    <ColumnBadges column={column} />
+                    <em>{column.type}</em>
                   </span>
                 ))}
               </div>
@@ -469,6 +576,160 @@ function SchemaPanel({ schema, onRefresh, isOpen, onToggle }) {
       </div>
     </aside>
   );
+}
+
+function SchemaMermaidDiagram({ schema, mode, onModeChange, selectedTable, onSelectTable }) {
+  const tableNames = Object.keys(schema);
+  const availableTables = new Set(tableNames);
+  const nodes = tableNames
+    .map((table) => ({ table, ...(schemaNodeLayout[table] || fallbackNodePosition(table, tableNames)) }))
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  const relationships = schemaRelationships.filter(
+    ([source, target]) => availableTables.has(source) && availableTables.has(target),
+  );
+  const mermaidSource = buildMermaidSource(tableNames, relationships);
+
+  return (
+    <section className="schema-diagram" aria-label="Mermaid schema table diagram">
+      <div className="schema-diagram-title">
+        <span>Mermaid ERD</span>
+        <div className="schema-mode-toggle" aria-label="Diagram mode">
+          <button type="button" className={mode === "visual" ? "active" : ""} onClick={() => onModeChange("visual")}>
+            Visual
+          </button>
+          <button type="button" className={mode === "source" ? "active" : ""} onClick={() => onModeChange("source")}>
+            Source
+          </button>
+        </div>
+      </div>
+      {mode === "source" ? (
+        <pre className="mermaid-source">{mermaidSource}</pre>
+      ) : (
+      <div className="schema-diagram-scroll">
+        <svg viewBox="0 0 660 800" role="img" aria-label="Schema relationship diagram">
+          <defs>
+            <marker id="schema-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" />
+            </marker>
+          </defs>
+          {relationships.map(([source, target, label]) => {
+            const sourceNode = schemaNodeLayout[source] || fallbackNodePosition(source, tableNames);
+            const targetNode = schemaNodeLayout[target] || fallbackNodePosition(target, tableNames);
+            const x1 = sourceNode.x + 160;
+            const y1 = sourceNode.y + 24;
+            const x2 = targetNode.x;
+            const y2 = targetNode.y + 24;
+            const midX = (x1 + x2) / 2;
+            const isActive = selectedTable && (selectedTable === source || selectedTable === target);
+            return (
+              <g key={`${source}-${target}`} className={isActive ? "is-active" : ""}>
+                <path
+                  className="schema-link"
+                  d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
+                  markerEnd="url(#schema-arrow)"
+                />
+                <text className="schema-link-label" x={midX - 28} y={(y1 + y2) / 2 - 4}>
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+          {nodes.map(({ table, x, y }) => (
+            <g
+              key={table}
+              className={`schema-node ${selectedTable === table ? "is-selected" : ""}`}
+              onClick={() => onSelectTable(table)}
+              role="button"
+              tabIndex="0"
+            >
+              <rect x={x} y={y} width="160" height="48" />
+              <text x={x + 12} y={y + 21}>{table}</text>
+              <text className="schema-node-meta" x={x + 12} y={y + 36}>
+                {(schema[table] || []).length} columns
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      )}
+    </section>
+  );
+}
+
+function TableDetailDrawer({ table, columns, onClose }) {
+  if (!table) return null;
+  const relations = schemaRelationships.filter(([source, target]) => source === table || target === table);
+
+  return (
+    <section className="table-drawer" aria-label={`${table} table details`}>
+      <div className="table-drawer-header">
+        <div>
+          <span>Table detail</span>
+          <h3>{table}</h3>
+        </div>
+        <button type="button" className="text-action" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <p>{tableDescriptions[table] || "Database table available to the Text-to-SQL agent."}</p>
+      <div className="table-drawer-meta">
+        <span>{columns.length} columns</span>
+        <span>{relations.length} links</span>
+      </div>
+      <div className="drawer-column-list">
+        {columns.map((column) => (
+          <span key={column.name}>
+            <strong>{column.name}</strong>
+            <ColumnBadges column={column} />
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ColumnBadges({ column }) {
+  const badges = getColumnBadges(column);
+  return (
+    <span className="column-badges" aria-label={`${column.name} column badges`}>
+      {badges.map((badge) => (
+        <i key={badge}>{badge}</i>
+      ))}
+    </span>
+  );
+}
+
+function getColumnBadges(column) {
+  const name = column.name.toLowerCase();
+  const badges = [];
+  if (column.primary_key) badges.push("PK");
+  if (name.endsWith("_id") && !column.primary_key) badges.push("FK");
+  if (name.includes("status") || name.includes("priority") || name.includes("tier") || name.includes("stage")) badges.push("ENUM");
+  if (name.includes("amount") || name.includes("price") || name.includes("fee")) badges.push("MONEY");
+  if (name.endsWith("_on") || name.includes("date") || name.includes("month")) badges.push("DATE");
+  if (name.includes("email")) badges.push("PII");
+  return badges.length ? badges : ["COL"];
+}
+
+function buildMermaidSource(tableNames, relationships) {
+  const lines = ["erDiagram"];
+  relationships.forEach(([source, target, label]) => {
+    lines.push(`  ${source} ||--o{ ${target} : "${label}"`);
+  });
+  tableNames.forEach((table) => {
+    if (!relationships.some(([source, target]) => source === table || target === table)) {
+      lines.push(`  ${table}`);
+    }
+  });
+  return lines.join("\n");
+}
+
+function fallbackNodePosition(table, tableNames) {
+  const index = tableNames.indexOf(table);
+  return {
+    x: 24 + (index % 3) * 226,
+    y: 64 + Math.floor(index / 3) * 112,
+  };
 }
 
 function HistoryPanel({ records, onRefresh, onSelect, isOpen, onToggle }) {
