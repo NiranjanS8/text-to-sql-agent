@@ -4,15 +4,11 @@ from text_to_sql_agent.config import Settings, get_settings
 from text_to_sql_agent.database import format_schema_for_prompt
 from text_to_sql_agent.llm import create_mistral_chat
 from text_to_sql_agent.prompts import SQL_GENERATION_PROMPT
+from text_to_sql_agent.sql_validator import cleanup_sql
 
 
 def cleanup_generated_sql(sql: str) -> str:
-    cleaned = sql.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.removeprefix("```").removesuffix("```").strip()
-        if cleaned.lower().startswith("sql"):
-            cleaned = cleaned[3:]
-    return cleaned.strip()
+    return cleanup_sql(sql)
 
 
 def generate_sql(question: str, settings: Settings | None = None) -> str:
