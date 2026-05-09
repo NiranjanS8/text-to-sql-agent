@@ -21,6 +21,25 @@ def test_schema_endpoint_returns_sample_tables() -> None:
     assert {"students", "courses", "enrollments", "payments"}.issubset(tables.keys())
 
 
+def test_history_endpoint_returns_saved_queries(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name FROM students ORDER BY id;",
+    )
+
+    ask_response = client.post("/ask", json={"question": "Show student names for history"})
+    history_response = client.get("/history?limit=1")
+
+    assert ask_response.status_code == 200
+    assert history_response.status_code == 200
+    history = history_response.json()["history"]
+    assert len(history) == 1
+    assert history[0]["question"] == "Show student names for history"
+    assert history[0]["generated_sql"] == "SELECT name FROM students ORDER BY id;"
+    assert history[0]["execution_status"] == "success"
+    assert history[0]["error_message"] is None
+
+
 def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
     def fake_generate_sql(question: str, settings=None) -> str:
         assert question == "Show all students"

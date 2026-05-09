@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS payments (
     status TEXT NOT NULL,
     FOREIGN KEY (enrollment_id) REFERENCES enrollments(id)
 );
+
+CREATE TABLE IF NOT EXISTS query_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    generated_sql TEXT NOT NULL,
+    execution_status TEXT NOT NULL,
+    error_message TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -161,4 +170,3 @@ def format_schema_for_prompt(database_path: Path | None = None) -> str:
         column_text = ", ".join(f"{column['name']} {column['type']}" for column in columns)
         lines.append(f"{table}({column_text})")
     return "\n".join(lines)
-

@@ -1,12 +1,13 @@
 import logging
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from text_to_sql_agent.agent_workflow import run_agent_pipeline
 from text_to_sql_agent.config import get_settings
 from text_to_sql_agent.database import get_schema, initialize_database
+from text_to_sql_agent.history import list_query_history, save_query_history
 from text_to_sql_agent.llm import LLMConfigurationError, test_mistral_connection
 
 
@@ -33,6 +34,11 @@ def create_app() -> FastAPI:
     def schema() -> dict[str, object]:
         return {"tables": get_schema(settings.database_path)}
 
+    @app.get("/history", tags=["agent"])
+    def history(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, object]:
+        records = list_query_history(limit=limit, database_path=settings.database_path)
+        return {"history": [record.to_dict() for record in records]}
+
     @app.post("/ask", tags=["agent"])
     def ask(request: AskRequest) -> dict[str, object]:
         try:
@@ -40,6 +46,7 @@ def create_app() -> FastAPI:
         except LLMConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+        save_query_history(workflow, database_path=settings.database_path)
         return workflow.to_dict()
 
     @app.get("/mistral/health", tags=["system"])
