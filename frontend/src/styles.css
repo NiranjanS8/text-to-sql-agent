@@ -145,7 +145,7 @@ button {
 
 .workbench {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(520px, 50vw) minmax(0, 1fr) 300px;
   height: calc(100vh - 56px);
   overflow: hidden;
   transition: grid-template-columns 160ms ease;
@@ -156,7 +156,7 @@ button {
 }
 
 .workbench.history-collapsed {
-  grid-template-columns: 260px minmax(0, 1fr) 44px;
+  grid-template-columns: minmax(520px, 50vw) minmax(0, 1fr) 44px;
 }
 
 .workbench.schema-collapsed.history-collapsed {
@@ -1072,7 +1072,7 @@ summary em,
 
 @media (max-width: 1280px) {
   .workbench {
-    grid-template-columns: 220px minmax(0, 1fr) 260px;
+    grid-template-columns: minmax(440px, 48vw) minmax(0, 1fr) 260px;
   }
 
   .workbench.schema-collapsed {
@@ -1080,7 +1080,7 @@ summary em,
   }
 
   .workbench.history-collapsed {
-    grid-template-columns: 220px minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(440px, 48vw) minmax(0, 1fr) 44px;
   }
 
   .workbench.schema-collapsed.history-collapsed {
