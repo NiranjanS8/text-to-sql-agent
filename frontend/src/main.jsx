@@ -13,6 +13,7 @@ import {
   Search,
   Sparkles,
   TableProperties,
+  Terminal,
 } from "lucide-react";
 import "./styles.css";
 
@@ -89,62 +90,80 @@ function App() {
   }
 
   return (
-    <main className="app">
-      <section className="command-deck">
-        <header className="masthead">
-          <div>
-            <p className="kicker">SQLite agent console</p>
-            <h1>Text-to-SQL Agent</h1>
-          </div>
+    <div className="app-shell">
+      <nav className="top-nav">
+        <div className="brand-lockup">
+          <span className="brand-mark">SQL_ARCHITECT</span>
           <StatusPill health={health} />
-        </header>
+        </div>
+        <div className="nav-actions" aria-label="System controls">
+          <button type="button" title="Signals">
+            <Activity size={18} />
+          </button>
+          <button type="button" title="Terminal">
+            <Terminal size={18} />
+          </button>
+        </div>
+      </nav>
 
-        <form className="query-console" onSubmit={runQuery}>
-          <label htmlFor="question">Ask a database question</label>
-          <div className="input-row">
-            <Search size={20} aria-hidden="true" />
-            <textarea
-              id="question"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask about students, courses, enrollments, or payments"
-              rows={3}
-            />
-          </div>
-          <div className="console-actions">
-            <div className="sample-strip" aria-label="Sample questions">
-              {sampleQuestions.map((sample) => (
-                <button key={sample} type="button" onClick={() => setQuestion(sample)}>
-                  {sample}
-                </button>
-              ))}
-            </div>
-            <button className="run-button" type="submit" disabled={isLoading}>
-              {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
-              {isLoading ? "Running" : "Run query"}
-            </button>
-          </div>
-          {error ? (
-            <p className="error-line">
-              <AlertTriangle size={16} />
-              {error}
-            </p>
-          ) : null}
-        </form>
-
-        <AnswerPanel answer={answer} isLoading={isLoading} />
-        <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
-      </section>
-
-      <aside className="intel-rail">
+      <main className="workbench">
         <SchemaPanel schema={schema} onRefresh={loadSchema} />
+
+        <section className="data-canvas">
+          <div className="canvas-inner">
+            <header className="canvas-header">
+              <div>
+                <p className="kicker">Main cluster database</p>
+                <h1>Natural language SQL console</h1>
+              </div>
+              <div className="execution-meter">
+                <span>{isLoading ? "GENERATING SQL" : answer?.status?.toUpperCase() || "STANDBY"}</span>
+              </div>
+            </header>
+
+            <form className="query-console" onSubmit={runQuery}>
+              <div className="input-row">
+                <Search size={20} aria-hidden="true" />
+                <textarea
+                  id="question"
+                  aria-label="Ask a database question"
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  placeholder="Ask about students, courses, enrollments, or payments"
+                  rows={3}
+                />
+                <button className="run-button" type="submit" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
+                  {isLoading ? "Running" : "Run query"}
+                </button>
+              </div>
+              <div className="sample-strip" aria-label="Sample questions">
+                {sampleQuestions.map((sample) => (
+                  <button key={sample} type="button" onClick={() => setQuestion(sample)}>
+                    {sample}
+                  </button>
+                ))}
+              </div>
+              {error ? (
+                <p className="error-line">
+                  <AlertTriangle size={16} />
+                  {error}
+                </p>
+              ) : null}
+            </form>
+
+            <AnswerPanel answer={answer} isLoading={isLoading} />
+            <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
+          </div>
+        </section>
+
         <HistoryPanel
           records={history}
           onRefresh={loadHistory}
           onSelect={(record) => setQuestion(record.question)}
         />
-      </aside>
-    </main>
+      </main>
+    </div>
   );
 }
 
@@ -152,7 +171,7 @@ function StatusPill({ health }) {
   const label = health === "online" ? "API online" : health === "offline" ? "API offline" : "Checking API";
   return (
     <div className={`status-pill ${health}`}>
-      <Activity size={16} />
+      <span className="status-led" />
       {label}
     </div>
   );
@@ -240,11 +259,11 @@ function ResultsTable({ rows, rowCount }) {
 
 function SchemaPanel({ schema, onRefresh }) {
   return (
-    <section className="rail-panel">
+    <aside className="schema-rail">
       <div className="panel-title">
         <h2>
           <Database size={18} />
-          Schema
+          Schema Explorer
         </h2>
         <button type="button" className="tool-button" onClick={onRefresh} title="Refresh schema">
           <RefreshCw size={16} />
@@ -258,13 +277,13 @@ function SchemaPanel({ schema, onRefresh }) {
           </details>
         ))}
       </div>
-    </section>
+    </aside>
   );
 }
 
 function HistoryPanel({ records, onRefresh, onSelect }) {
   return (
-    <section className="rail-panel">
+    <aside className="history-rail">
       <div className="panel-title">
         <h2>
           <History size={18} />
@@ -286,9 +305,8 @@ function HistoryPanel({ records, onRefresh, onSelect }) {
           <p className="empty-state compact">No saved queries yet.</p>
         )}
       </div>
-    </section>
+    </aside>
   );
 }
 
 createRoot(document.getElementById("root")).render(<App />);
-
