@@ -111,6 +111,7 @@ def run_agent_pipeline(
     question: str,
     settings: Settings | None = None,
     max_retries: int = 2,
+    max_empty_result_retries: int = 1,
 ) -> AgentWorkflowResult:
     active_settings = settings or get_settings()
     database_path = active_settings.database_path
@@ -138,6 +139,27 @@ def run_agent_pipeline(
                 "question": question,
                 "failed_sql": execution.sql,
                 "error": execution.error or "Unknown SQLite error.",
+            }
+        )
+        corrected_sql.append(repaired_sql)
+        validation = validation_tool.invoke({"sql": repaired_sql})
+        sql_to_execute = validation.sql if validation.is_safe else repaired_sql
+        execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+        if not validation.is_safe:
+            break
+
+    empty_result_retries = 0
+    while execution.status == "success" and execution.row_count == 0 and empty_result_retries < max_empty_result_retries:
+        empty_result_retries += 1
+        retries_used += 1
+        repaired_sql = correction_tool.invoke(
+            {
+                "question": question,
+                "failed_sql": execution.sql,
+                "error": (
+                    "Query executed successfully but returned no rows. "
+                    "Reconsider exact text filters and use LIKE wildcards for partial user terms."
+                ),
             }
         )
         corrected_sql.append(repaired_sql)

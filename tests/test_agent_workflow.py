@@ -89,6 +89,44 @@ def test_run_agent_pipeline_corrects_sql_execution_errors(tmp_path: Path, monkey
     assert result.to_dict()["final_answer"] == "Found 10 matching rows for: Show all student names"
 
 
+def test_run_agent_pipeline_corrects_overly_exact_empty_results(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    settings = Settings(DATABASE_URL=f"sqlite:///{database_path}")
+
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: """
+        SELECT students.name
+        FROM students
+        JOIN enrollments ON enrollments.student_id = students.id
+        JOIN courses ON courses.id = enrollments.course_id
+        WHERE courses.title = 'Java course';
+        """,
+    )
+
+    def fake_correct_sql(question: str, failed_sql: str, error: str, settings=None) -> str:
+        assert "returned no rows" in error
+        return """
+        SELECT students.name
+        FROM students
+        JOIN enrollments ON enrollments.student_id = students.id
+        JOIN courses ON courses.id = enrollments.course_id
+        WHERE courses.title LIKE '%Java%';
+        """
+
+    monkeypatch.setattr("text_to_sql_agent.agent_workflow.correct_sql", fake_correct_sql)
+
+    result = run_agent_pipeline("Show all students enrolled in Java course", settings=settings)
+
+    assert result.retry_count == 1
+    assert len(result.corrected_sql) == 1
+    assert result.execution.status == "success"
+    assert result.execution.row_count == 2
+    assert result.to_dict()["data"] == [{"name": "Meera Iyer"}, {"name": "Kabir Khan"}]
+    assert result.to_dict()["final_answer"] == "Found 2 matching rows for: Show all students enrolled in Java course"
+
+
 def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "sample.db"
     initialize_database(database_path)
