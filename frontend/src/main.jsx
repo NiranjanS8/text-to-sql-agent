@@ -135,12 +135,6 @@ function App() {
         <section className="data-canvas">
           <div className="canvas-inner">
             <section className="query-stage">
-              <div className="stage-copy">
-                <p className="kicker">Main cluster database</p>
-                <h1>Ask, inspect, ship SQL</h1>
-                <PipelineStatus answer={answer} isLoading={isLoading} />
-              </div>
-
               <form className="query-console" onSubmit={runQuery}>
                 <label htmlFor="question">Natural language prompt</label>
                 <div className="input-row">
@@ -192,20 +186,6 @@ function App() {
           onToggle={() => setIsHistoryOpen((value) => !value)}
         />
       </main>
-    </div>
-  );
-}
-
-function PipelineStatus({ answer, isLoading }) {
-  const steps = ["Generate", "Validate", "Execute", "Format"];
-  const activeIndex = isLoading ? 1 : answer ? 3 : -1;
-  return (
-    <div className="pipeline-status" aria-label="Agent pipeline status">
-      {steps.map((step, index) => (
-        <span key={step} className={index <= activeIndex ? "is-active" : ""}>
-          {step}
-        </span>
-      ))}
     </div>
   );
 }

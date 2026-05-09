@@ -260,20 +260,7 @@ button {
 }
 
 .query-stage {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
-  align-items: stretch;
-}
-
-.stage-copy {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 218px;
-  border: 1px solid rgba(220, 207, 192, 0.16);
-  background: var(--surface);
-  padding: 16px;
+  display: block;
 }
 
 .canvas-header {
@@ -310,43 +297,6 @@ h1 {
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   text-transform: uppercase;
-}
-
-.pipeline-status {
-  display: grid;
-  gap: 6px;
-  margin-top: 18px;
-}
-
-.pipeline-status span {
-  position: relative;
-  padding: 8px 10px 8px 28px;
-  border: 1px solid var(--outline);
-  color: var(--muted);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.pipeline-status span::before {
-  content: "";
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  background: var(--outline-bright);
-  transform: translateY(-50%);
-}
-
-.pipeline-status span.is-active {
-  border-color: rgba(162, 175, 155, 0.62);
-  color: var(--secondary);
-}
-
-.pipeline-status span.is-active::before {
-  background: var(--secondary);
-  box-shadow: 0 0 6px rgba(162, 175, 155, 0.5);
 }
 
 .query-console,
@@ -575,7 +525,8 @@ textarea::placeholder {
 }
 
 .status-badge.sql_error,
-.status-badge.validation_error {
+.status-badge.validation_error,
+.status-badge.edge_case {
   border-color: var(--warning);
   color: var(--warning);
 }
@@ -780,17 +731,8 @@ summary em,
 }
 
 @media (max-width: 1120px) {
-  .query-stage,
   .analysis-grid {
     grid-template-columns: 1fr;
-  }
-
-  .stage-copy {
-    min-height: auto;
-  }
-
-  .pipeline-status {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

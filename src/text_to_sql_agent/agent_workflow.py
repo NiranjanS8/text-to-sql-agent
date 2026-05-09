@@ -6,6 +6,11 @@ from langchain_core.tools import StructuredTool
 
 from text_to_sql_agent.config import Settings, get_settings
 from text_to_sql_agent.database import format_schema_for_prompt
+from text_to_sql_agent.edge_cases import (
+    apply_question_sql_hints,
+    resolve_empty_result_edge_case,
+    resolve_validation_edge_case,
+)
 from text_to_sql_agent.query_executor import QueryExecutionResult, execute_sql
 from text_to_sql_agent.response_formatter import build_final_answer, explain_sql
 from text_to_sql_agent.sql_generator import correct_sql, generate_sql
@@ -126,10 +131,16 @@ def run_agent_pipeline(
 
     schema_context = schema_tool.invoke({})
     generated_sql = generation_tool.invoke({"question": question})
-    validation = validation_tool.invoke({"sql": generated_sql})
+    hinted_sql = apply_question_sql_hints(question, generated_sql)
+    validation = validation_tool.invoke({"sql": hinted_sql})
     sql_to_execute = validation.sql if validation.is_safe else generated_sql
     execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
     corrected_sql: list[str] = []
+
+    if execution.status == "validation_error":
+        edge_case_result = resolve_validation_edge_case(question, validation, database_path)
+        if edge_case_result:
+            execution = edge_case_result
 
     retries_used = 0
     while execution.status == "sql_error" and retries_used < max_retries:
@@ -147,6 +158,11 @@ def run_agent_pipeline(
         execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
         if not validation.is_safe:
             break
+
+    if execution.status == "success" and execution.row_count == 0:
+        edge_case_result = resolve_empty_result_edge_case(question, database_path)
+        if edge_case_result:
+            execution = edge_case_result
 
     empty_result_retries = 0
     while execution.status == "success" and execution.row_count == 0 and empty_result_retries < max_empty_result_retries:

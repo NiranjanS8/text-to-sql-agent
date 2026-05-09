@@ -77,5 +77,26 @@ def test_ask_endpoint_returns_validation_error_for_unsafe_generated_sql(monkeypa
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "validation_error"
-    assert payload["error"] == "Only SELECT queries are allowed."
+    assert payload["status"] == "edge_case"
+    assert "read-only" in payload["final_answer"]
+
+
+def test_ask_endpoint_returns_helpful_edge_case_for_impossible_course_count(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: """
+        SELECT students.name, COUNT(enrollments.id) AS course_count
+        FROM students
+        JOIN enrollments ON enrollments.student_id = students.id
+        GROUP BY students.id, students.name
+        HAVING COUNT(enrollments.id) > 12;
+        """,
+    )
+
+    response = client.post("/ask", json={"question": "Which students are enrolled in more than 12 course?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "edge_case"
+    assert "There are only 7 courses" in payload["final_answer"]
+    assert payload["row_count"] == 5

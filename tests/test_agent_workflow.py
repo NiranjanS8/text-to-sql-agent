@@ -119,12 +119,55 @@ def test_run_agent_pipeline_corrects_overly_exact_empty_results(tmp_path: Path, 
 
     result = run_agent_pipeline("Show all students enrolled in Java course", settings=settings)
 
-    assert result.retry_count == 1
-    assert len(result.corrected_sql) == 1
-    assert result.execution.status == "success"
+    assert result.retry_count == 0
+    assert result.corrected_sql == []
+    assert result.execution.status == "edge_case"
     assert result.execution.row_count == 2
-    assert result.to_dict()["data"] == [{"name": "Meera Iyer"}, {"name": "Kabir Khan"}]
-    assert result.to_dict()["final_answer"] == "Found 2 matching rows for: Show all students enrolled in Java course"
+    assert result.to_dict()["data"] == [
+        {"name": "Kabir Khan", "title": "Java Masterclass", "status": "completed"},
+        {"name": "Meera Iyer", "title": "Java Masterclass", "status": "active"},
+    ]
+    assert "Interpreted it as Java Masterclass" in result.to_dict()["final_answer"]
+
+
+def test_run_agent_pipeline_explains_impossible_course_count_request(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    settings = Settings(DATABASE_URL=f"sqlite:///{database_path}")
+
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: """
+        SELECT students.name, COUNT(enrollments.id) AS course_count
+        FROM students
+        JOIN enrollments ON enrollments.student_id = students.id
+        GROUP BY students.id, students.name
+        HAVING COUNT(enrollments.id) > 12;
+        """,
+    )
+
+    result = run_agent_pipeline("Which students are enrolled in more than 12 course?", settings=settings)
+
+    assert result.execution.status == "edge_case"
+    assert result.execution.row_count == 5
+    assert "There are only 7 courses" in result.to_dict()["final_answer"]
+    assert result.to_dict()["data"][0] == {"name": "Aarav Sharma", "course_count": 2}
+
+
+def test_run_agent_pipeline_adds_limit_for_top_queries(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    settings = Settings(DATABASE_URL=f"sqlite:///{database_path}")
+
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name FROM students ORDER BY name;",
+    )
+
+    result = run_agent_pipeline("Show top students by name", settings=settings)
+
+    assert result.execution.sql == "SELECT name FROM students ORDER BY name LIMIT 10;"
+    assert result.execution.row_count == 10
 
 
 def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path, monkeypatch) -> None:
