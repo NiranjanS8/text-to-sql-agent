@@ -22,10 +22,10 @@ import {
 import "./styles.css";
 
 const sampleQuestions = [
-  "Show all students enrolled in Java course",
-  "Which course categories have earned the most money?",
+  "Which SaaS customers have overdue invoice balance?",
+  "Which organizations have the highest AI SQL Copilot adoption?",
+  "Show usage events by organization",
   "Show students with partial payments and pending amount",
-  "Which students are enrolled in more than one course?",
 ];
 
 const defaultSavedQueries = [
@@ -282,7 +282,7 @@ function App() {
                     aria-label="Ask a database question"
                     value={question}
                     onChange={(event) => setQuestion(event.target.value)}
-                    placeholder="Ask about students, courses, enrollments, or payments"
+                    placeholder="Ask about SaaS customers, subscriptions, invoices, usage, support tickets, features, or education payments"
                     rows={4}
                   />
                 </div>
