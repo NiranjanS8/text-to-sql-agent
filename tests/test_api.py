@@ -10,8 +10,8 @@ def test_index_serves_demo_ui() -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "Text-to-SQL Agent" in response.text
-    assert "/static/styles.css" in response.text
+    assert '<div id="root">' in response.text
+    assert "/static/react/assets/" in response.text
 
 
 def test_health_endpoint() -> None:

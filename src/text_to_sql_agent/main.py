@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     logging.basicConfig(level=settings.log_level.upper())
     initialize_database(settings.database_path)
     static_dir = Path(__file__).resolve().parents[2] / "static"
+    react_index = static_dir / "react" / "index.html"
 
     app = FastAPI(
         title="Text-to-SQL Agent",
@@ -33,7 +34,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", tags=["ui"])
     def index() -> FileResponse:
-        return FileResponse(static_dir / "index.html")
+        return FileResponse(react_index)
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
