@@ -203,6 +203,22 @@ function App() {
     window.setTimeout(() => setCopied(false), 1400);
   }
 
+  function exportResults() {
+    const rows = answer?.data || [];
+    if (!rows.length) return;
+
+    const csv = toCsv(rows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${slugify(answer?.question || "query-results")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="app-shell">
       <nav className="top-nav">
@@ -282,7 +298,7 @@ function App() {
 
             <FinalAnswerBand answer={answer} isLoading={isLoading} />
             <ApprovalPanel answer={answer} isLoading={isLoading} onApprove={approveSql} />
-            <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
+            <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} onExport={exportResults} />
             <section className="analysis-grid">
               <SqlPanel answer={answer} onCopy={copySql} copied={copied} />
               <InsightPanel answer={answer} />
@@ -331,6 +347,22 @@ function StatusPill({ health }) {
       {label}
     </div>
   );
+}
+
+function toCsv(rows) {
+  const columns = Object.keys(rows[0] || {});
+  const header = columns.map(escapeCsvCell).join(",");
+  const body = rows.map((row) => columns.map((column) => escapeCsvCell(row[column])).join(","));
+  return [header, ...body].join("\n");
+}
+
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function slugify(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64) || "query-results";
 }
 
 function StatusBadge({ status, corrected }) {
@@ -448,7 +480,7 @@ function InsightPanel({ answer }) {
   );
 }
 
-function ResultsTable({ rows, rowCount }) {
+function ResultsTable({ rows, rowCount, onExport }) {
   const columns = useMemo(() => (rows.length ? Object.keys(rows[0]) : []), [rows]);
 
   return (
@@ -460,7 +492,7 @@ function ResultsTable({ rows, rowCount }) {
         </h2>
         <div className="panel-actions">
           <span>{rowCount} rows</span>
-          <button type="button" className="text-action" disabled={!rows.length}>
+          <button type="button" className="text-action" disabled={!rows.length} onClick={onExport}>
             <FileDown size={15} />
             Export
           </button>

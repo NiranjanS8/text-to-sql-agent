@@ -70,6 +70,10 @@ This demonstrates bounded tool use and human review before database actions.
 
 Final answers include lightweight result-aware summaries instead of only row counts. The formatter highlights useful signals such as highest pending amount, invoice balance, feature usage, course counts, or the first matching entity when the result shape is simple.
 
+## CSV Export
+
+The Results panel can export the current table as a CSV file. Filenames are generated from the natural-language question so saved results are easy to recognize.
+
 ## Semantic Guardrails
 
 The agent applies semantic checks after SQL validation and before database execution. These guardrails catch cases where SQL is technically safe but likely wrong or risky:
