@@ -88,6 +88,51 @@ BUSINESS_RULES: tuple[BusinessRule, ...] = (
         ),
         keywords=("top", "highest", "lowest", "bottom", "best", "most", "least", "rank"),
     ),
+    BusinessRule(
+        id="saas_subscription_revenue",
+        title="SaaS subscription revenue",
+        content=(
+            "SaaS revenue questions should join organizations -> subscriptions -> plans. "
+            "MRR is plans.monthly_price. Annual recurring revenue can be approximated as plans.monthly_price * 12."
+        ),
+        keywords=("saas", "subscription", "subscriptions", "mrr", "arr", "revenue", "plan", "plans", "customer"),
+    ),
+    BusinessRule(
+        id="saas_invoice_balance",
+        title="Invoice balance",
+        content=(
+            "Open, partial, and overdue invoice balance means invoices.amount_due - invoices.amount_paid. "
+            "Join invoices -> subscriptions -> organizations for customer names."
+        ),
+        keywords=("invoice", "invoices", "balance", "overdue", "due", "paid", "partial", "open", "billing"),
+    ),
+    BusinessRule(
+        id="saas_usage_analysis",
+        title="Usage analytics",
+        content=(
+            "Usage questions use usage_events.event_count grouped by organizations, app_users, event_type, or occurred_on. "
+            "Join usage_events.organization_id to organizations.id for account-level reporting."
+        ),
+        keywords=("usage", "events", "event", "api", "agent", "dashboard", "export", "active", "activity"),
+    ),
+    BusinessRule(
+        id="saas_support_health",
+        title="Support and account health",
+        content=(
+            "Support-health questions use support_tickets joined to organizations. "
+            "Open urgent or high-priority tickets can indicate churn risk."
+        ),
+        keywords=("support", "ticket", "tickets", "priority", "urgent", "open", "resolved", "churn", "risk"),
+    ),
+    BusinessRule(
+        id="saas_feature_adoption",
+        title="Feature adoption",
+        content=(
+            "Feature adoption questions join feature_adoption -> feature_flags -> organizations and use active_users "
+            "or usage_count for adoption strength."
+        ),
+        keywords=("feature", "features", "adoption", "flag", "flags", "enabled", "usage", "users"),
+    ),
 )
 
 
@@ -134,6 +179,21 @@ def retrieve_relevant_values(question: str, database_path: Path | None = None) -
     if tokens & {"more", "than", "course", "courses", "enrolled"}:
         total_courses = _count_rows("courses", database_path)
         values.append(f"Total courses available: {total_courses}")
+    if tokens & {"organization", "organizations", "customer", "customers", "account", "accounts", "saas"}:
+        values.append("Known organization lifecycle stages: " + ", ".join(_distinct_values("organizations", "lifecycle_stage", database_path)))
+        values.append("Known organization regions: " + ", ".join(_distinct_values("organizations", "region", database_path)))
+    if tokens & {"subscription", "subscriptions", "plan", "plans", "mrr", "arr", "revenue"}:
+        values.append("Known plan names: " + ", ".join(_distinct_values("plans", "name", database_path)))
+        values.append("Known subscription statuses: " + ", ".join(_distinct_values("subscriptions", "status", database_path)))
+    if tokens & {"invoice", "invoices", "overdue", "billing", "balance", "due"}:
+        values.append("Known invoice statuses: " + ", ".join(_distinct_values("invoices", "status", database_path)))
+    if tokens & {"usage", "event", "events", "api", "agent", "dashboard", "export"}:
+        values.append("Known usage event types: " + ", ".join(_distinct_values("usage_events", "event_type", database_path)))
+    if tokens & {"ticket", "tickets", "support", "priority", "urgent"}:
+        values.append("Known support priorities: " + ", ".join(_distinct_values("support_tickets", "priority", database_path)))
+        values.append("Known support statuses: " + ", ".join(_distinct_values("support_tickets", "status", database_path)))
+    if tokens & {"feature", "features", "adoption", "flag", "flags"}:
+        values.append("Known feature flags: " + ", ".join(_distinct_values("feature_flags", "key", database_path)))
 
     return values
 

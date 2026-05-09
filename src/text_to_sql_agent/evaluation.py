@@ -111,6 +111,20 @@ DEFAULT_BENCHMARK_CASES: tuple[BenchmarkCase, ...] = (
         expected_row_count=10,
         expected_sql_terms=("limit",),
     ),
+    BenchmarkCase(
+        id="saas_overdue_invoices",
+        question="Which SaaS customers have overdue invoice balance?",
+        expected_tables=("organizations", "subscriptions", "invoices"),
+        minimum_row_count=1,
+        expected_sql_terms=("amount_due", "amount_paid"),
+    ),
+    BenchmarkCase(
+        id="saas_feature_adoption",
+        question="Which organizations have the highest AI SQL Copilot adoption?",
+        expected_tables=("organizations", "feature_adoption", "feature_flags"),
+        minimum_row_count=1,
+        expected_sql_terms=("usage_count", "active_users"),
+    ),
 )
 
 

@@ -166,6 +166,76 @@ def test_semantic_guardrail_catches_payment_query_without_payments_table(tmp_pat
     assert {"name": "Ishaan Gupta", "title": "Data Analytics", "amount": 18000, "status": "paid", "paid_on": "2025-07-01"} in result.data
 
 
+def test_semantic_guardrail_canonicalizes_partial_payment_pending_amount(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    result = resolve_semantic_guardrail(
+        "Show students with partial payments and pending amount",
+        """
+        SELECT students.name, payments.amount
+        FROM students
+        JOIN enrollments ON enrollments.student_id = students.id
+        JOIN payments ON payments.enrollment_id = enrollments.id
+        WHERE payments.status = 'partial';
+        """,
+        database_path=database_path,
+    )
+
+    assert result is not None
+    assert result.status == "edge_case"
+    assert "courses.fee - payments.amount" in str(result.message)
+    assert result.data == [
+        {
+            "name": "Ananya Rao",
+            "title": "Data Analytics",
+            "fee": 18000,
+            "paid_amount": 9000,
+            "pending_amount": 9000,
+            "status": "partial",
+            "paid_on": "2025-03-16",
+        },
+        {
+            "name": "Ananya Rao",
+            "title": "Web Development",
+            "fee": 17000,
+            "paid_amount": 8500,
+            "pending_amount": 8500,
+            "status": "partial",
+            "paid_on": "2025-06-25",
+        },
+        {
+            "name": "Vikram Singh",
+            "title": "SQL for Analytics",
+            "fee": 14000,
+            "paid_amount": 7000,
+            "pending_amount": 7000,
+            "status": "partial",
+            "paid_on": "2025-06-16",
+        },
+    ]
+
+
+def test_semantic_guardrail_allows_correct_partial_payment_pending_amount(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    result = resolve_semantic_guardrail(
+        "Show students with partial payments and pending amount",
+        """
+        SELECT students.name, courses.title, courses.fee - payments.amount AS pending_amount
+        FROM payments
+        JOIN enrollments ON enrollments.id = payments.enrollment_id
+        JOIN students ON students.id = enrollments.student_id
+        JOIN courses ON courses.id = enrollments.course_id
+        WHERE payments.status = 'partial';
+        """,
+        database_path=database_path,
+    )
+
+    assert result is None
+
+
 def test_semantic_guardrail_catches_invalid_status_filter(tmp_path: Path) -> None:
     database_path = tmp_path / "sample.db"
     initialize_database(database_path)

@@ -2,6 +2,18 @@
 
 FastAPI backend for asking natural-language questions over a SQLite database using LangChain and Mistral.
 
+## Sample Domain
+
+The SQLite database includes both the original education domain and a richer SaaS analytics domain. The SaaS schema supports resume-grade Text-to-SQL questions across:
+
+- organizations, lifecycle stages, industries, regions, and employee counts
+- app users, roles, activity, and account ownership
+- plans, subscriptions, billing intervals, seat counts, and renewal dates
+- invoices, overdue balances, partial payments, and paid/open statuses
+- usage events for API calls, agent runs, dashboards, exports, and query execution
+- support tickets by priority, category, status, and resolution time
+- feature flags and feature adoption metrics
+
 ## Evaluation Harness
 
 The project includes a benchmark runner for measuring whether the agent behaves like a production Text-to-SQL system instead of a one-off demo.

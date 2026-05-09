@@ -82,6 +82,7 @@ def resolve_semantic_guardrail(
     database_path: Path | None = None,
 ) -> QueryExecutionResult | None:
     resolvers = (
+        _resolve_partial_payment_pending_amount_request,
         _resolve_sensitive_student_data_request,
         _resolve_ambiguous_ranking_request,
         _resolve_payment_query_without_payment_join,
@@ -148,6 +149,55 @@ def _resolve_payment_threshold_request(question: str, database_path: Path | None
     message = (
         f"The highest payment amount in the database is {max_amount}, so there are no payments above "
         f"{requested_amount}. Here are the largest payments instead."
+    )
+    return _with_edge_message(result, message)
+
+
+def _resolve_partial_payment_pending_amount_request(
+    question: str,
+    sql: str,
+    database_path: Path | None,
+) -> QueryExecutionResult | None:
+    lowered_question = question.lower()
+    lowered_sql = cleanup_sql(sql).lower()
+    asks_partial_pending = (
+        "partial" in lowered_question
+        and any(term in lowered_question for term in ("payment", "payments", "paid"))
+        and any(term in lowered_question for term in ("pending", "due", "balance", "remaining"))
+    )
+    if not asks_partial_pending:
+        return None
+
+    has_required_tables = all(table in lowered_sql for table in ("students", "courses", "enrollments", "payments"))
+    filters_partial_payment = "payments.status" in lowered_sql and "partial" in lowered_sql
+    computes_pending_amount = (
+        "fee" in lowered_sql
+        and "amount" in lowered_sql
+        and re.search(r"(courses\.fee|fee)\s*-\s*(payments\.amount|amount)", lowered_sql) is not None
+    )
+
+    if has_required_tables and filters_partial_payment and computes_pending_amount:
+        return None
+
+    canonical_sql = """
+    SELECT students.name,
+           courses.title,
+           courses.fee,
+           payments.amount AS paid_amount,
+           courses.fee - payments.amount AS pending_amount,
+           payments.status,
+           payments.paid_on
+    FROM payments
+    JOIN enrollments ON enrollments.id = payments.enrollment_id
+    JOIN students ON students.id = enrollments.student_id
+    JOIN courses ON courses.id = enrollments.course_id
+    WHERE payments.status = 'partial'
+    ORDER BY pending_amount DESC, students.name;
+    """
+    result = execute_sql(question=question, sql=canonical_sql, database_path=database_path)
+    message = (
+        "Partial payment with pending amount needs courses.fee - payments.amount. "
+        "I used the canonical payment join and returned the pending amount for each partial payment."
     )
     return _with_edge_message(result, message)
 

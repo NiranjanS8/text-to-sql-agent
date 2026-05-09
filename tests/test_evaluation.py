@@ -117,4 +117,6 @@ def test_default_benchmark_cases_cover_resume_metrics() -> None:
     assert "java_students" in case_ids
     assert "category_revenue" in case_ids
     assert "impossible_course_threshold" in case_ids
+    assert "saas_overdue_invoices" in case_ids
+    assert "saas_feature_adoption" in case_ids
     assert all(case.expected_tables for case in DEFAULT_BENCHMARK_CASES)

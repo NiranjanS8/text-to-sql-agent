@@ -28,6 +28,17 @@ def test_schema_endpoint_returns_sample_tables() -> None:
     assert response.status_code == 200
     tables = response.json()["tables"]
     assert {"students", "courses", "enrollments", "payments"}.issubset(tables.keys())
+    assert {
+        "organizations",
+        "app_users",
+        "plans",
+        "subscriptions",
+        "invoices",
+        "usage_events",
+        "support_tickets",
+        "feature_flags",
+        "feature_adoption",
+    }.issubset(tables.keys())
 
 
 def test_history_endpoint_returns_saved_queries(monkeypatch) -> None:

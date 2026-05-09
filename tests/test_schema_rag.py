@@ -41,3 +41,29 @@ def test_build_retrieved_schema_context_combines_schema_rules_and_values(tmp_pat
     assert "Course revenue" in context
     assert "Retrieved database values:" in context
     assert "Known course categories" in context
+
+
+def test_schema_rag_retrieves_saas_revenue_context(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    context = build_retrieved_schema_context(
+        "Which SaaS customers have overdue invoice balance?",
+        database_path,
+    )
+
+    assert "organizations(id INTEGER" in context
+    assert "subscriptions(id INTEGER" in context
+    assert "invoices(id INTEGER" in context
+    assert "SaaS subscription revenue" in context
+    assert "Invoice balance" in context
+    assert "Known invoice statuses" in context
+
+
+def test_schema_rag_retrieves_feature_adoption_context(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    values = retrieve_relevant_values("Show feature adoption for AI SQL Copilot", database_path)
+
+    assert any("Known feature flags" in value and "ai_sql_copilot" in value for value in values)
