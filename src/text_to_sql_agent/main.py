@@ -14,6 +14,12 @@ from text_to_sql_agent.history import list_query_history, save_query_history
 from text_to_sql_agent.llm import LLMConfigurationError, test_mistral_connection
 
 
+RATE_LIMIT_MESSAGE = (
+    "The LLM provider is rate limiting requests right now. Please wait a minute and try again, "
+    "or switch to a lower-traffic model/API key."
+)
+
+
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, examples=["Show all students enrolled in Java course"])
     require_approval: bool = Field(default=False, description="Return generated SQL for review before execution.")
@@ -64,6 +70,10 @@ def create_app() -> FastAPI:
                 workflow = run_agent_pipeline(request.question, settings=settings)
         except LLMConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            if _is_rate_limit_error(exc):
+                raise HTTPException(status_code=429, detail=RATE_LIMIT_MESSAGE) from exc
+            raise
 
         if workflow.execution.status != "awaiting_approval":
             save_query_history(workflow, database_path=settings.database_path)
@@ -81,6 +91,10 @@ def create_app() -> FastAPI:
             return test_mistral_connection(settings)
         except LLMConfigurationError as exc:
             return {"status": "not_configured", "message": str(exc)}
+        except Exception as exc:
+            if _is_rate_limit_error(exc):
+                return {"status": "rate_limited", "message": RATE_LIMIT_MESSAGE}
+            raise
 
     return app
 
@@ -94,3 +108,18 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    text = f"{type(exc).__name__} {exc}".lower()
+    return any(
+        marker in text
+        for marker in (
+            "429",
+            "rate limit",
+            "rate_limit",
+            "too many requests",
+            "quota exceeded",
+            "insufficient_quota",
+        )
+    )

@@ -82,7 +82,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: question.trim(), require_approval: requireApproval }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
 
       if (!response.ok) {
         throw new Error(payload.detail || "The agent could not answer that question.");
@@ -109,7 +109,7 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: answer.question, sql: answer.sql }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
 
       if (!response.ok) {
         throw new Error(payload.detail || "The approved SQL could not be executed.");
@@ -229,6 +229,27 @@ function App() {
       </main>
     </div>
   );
+}
+
+async function readApiResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  if (response.status === 429 || /rate limit|too many requests|quota/i.test(text)) {
+    return {
+      detail:
+        "The LLM provider is rate limiting requests right now. Please wait a minute and try again.",
+    };
+  }
+
+  return {
+    detail: response.ok
+      ? text
+      : "The server returned an unexpected response. Please try again or check the backend logs.",
+  };
 }
 
 function StatusPill({ health }) {

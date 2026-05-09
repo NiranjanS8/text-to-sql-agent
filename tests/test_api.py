@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from text_to_sql_agent.main import RATE_LIMIT_MESSAGE
 from text_to_sql_agent.main import app
 
 
@@ -133,3 +134,27 @@ def test_ask_endpoint_returns_helpful_edge_case_for_impossible_course_count(monk
     assert payload["status"] == "edge_case"
     assert "There are only 7 courses" in payload["final_answer"]
     assert payload["row_count"] == 5
+
+
+def test_ask_endpoint_returns_json_for_llm_rate_limit(monkeypatch) -> None:
+    def raise_rate_limit(question, settings=None):
+        raise RuntimeError("429 Too Many Requests: rate limit exceeded")
+
+    monkeypatch.setattr("text_to_sql_agent.main.run_agent_pipeline", raise_rate_limit)
+
+    response = client.post("/ask", json={"question": "Show all students"})
+
+    assert response.status_code == 429
+    assert response.json() == {"detail": RATE_LIMIT_MESSAGE}
+
+
+def test_mistral_health_reports_rate_limit(monkeypatch) -> None:
+    def raise_rate_limit(settings):
+        raise RuntimeError("429 Too Many Requests")
+
+    monkeypatch.setattr("text_to_sql_agent.main.test_mistral_connection", raise_rate_limit)
+
+    response = client.get("/mistral/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "rate_limited", "message": RATE_LIMIT_MESSAGE}
