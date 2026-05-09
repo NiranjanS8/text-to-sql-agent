@@ -7,6 +7,7 @@ from langchain_core.tools import StructuredTool
 from text_to_sql_agent.config import Settings, get_settings
 from text_to_sql_agent.database import format_schema_for_prompt
 from text_to_sql_agent.query_executor import QueryExecutionResult, execute_sql
+from text_to_sql_agent.response_formatter import build_final_answer, explain_sql
 from text_to_sql_agent.sql_generator import correct_sql, generate_sql
 from text_to_sql_agent.sql_validator import ValidationResult, validate_sql
 
@@ -21,12 +22,16 @@ class AgentWorkflowResult:
     execution: QueryExecutionResult
     corrected_sql: list[str]
     retry_count: int
+    explanation: str
+    final_answer: str
 
     def to_dict(self) -> dict[str, Any]:
         response = self.execution.to_dict()
         response["original_sql"] = self.generated_sql
         response["corrected_sql"] = self.corrected_sql
         response["retry_count"] = self.retry_count
+        response["explanation"] = self.explanation
+        response["final_answer"] = self.final_answer
         return response
 
 
@@ -86,6 +91,22 @@ def create_sql_correction_tool(settings: Settings | None = None) -> StructuredTo
     )
 
 
+def create_sql_explanation_tool() -> StructuredTool:
+    return StructuredTool.from_function(
+        func=explain_sql,
+        name="sql_explanation",
+        description="Explains a generated SQL query in simple English.",
+    )
+
+
+def create_final_answer_tool() -> StructuredTool:
+    return StructuredTool.from_function(
+        func=build_final_answer,
+        name="final_answer",
+        description="Builds a concise natural-language answer from query execution results.",
+    )
+
+
 def run_agent_pipeline(
     question: str,
     settings: Settings | None = None,
@@ -99,6 +120,8 @@ def run_agent_pipeline(
     validation_tool = create_sql_validation_tool()
     execution_tool = create_sql_execution_tool(database_path)
     correction_tool = create_sql_correction_tool(active_settings)
+    explanation_tool = create_sql_explanation_tool()
+    final_answer_tool = create_final_answer_tool()
 
     schema_context = schema_tool.invoke({})
     generated_sql = generation_tool.invoke({"question": question})
@@ -124,6 +147,9 @@ def run_agent_pipeline(
         if not validation.is_safe:
             break
 
+    explanation = explanation_tool.invoke({"sql": execution.sql})
+    final_answer = final_answer_tool.invoke({"result": execution})
+
     return AgentWorkflowResult(
         question=question,
         schema_context=schema_context,
@@ -133,4 +159,6 @@ def run_agent_pipeline(
         execution=execution,
         corrected_sql=corrected_sql,
         retry_count=retries_used,
+        explanation=explanation,
+        final_answer=final_answer,
     )

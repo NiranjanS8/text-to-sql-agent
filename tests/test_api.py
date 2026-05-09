@@ -37,6 +37,10 @@ def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
     assert payload["status"] == "success"
     assert payload["row_count"] == 5
     assert payload["data"][0] == {"name": "Aarav Sharma", "city": "Delhi"}
+    assert payload["explanation"] == (
+        "This query reads the column(s) name, city from the students table and sorts the output."
+    )
+    assert payload["final_answer"] == "Found 5 matching rows for: Show all students"
 
 
 def test_ask_endpoint_returns_validation_error_for_unsafe_generated_sql(monkeypatch) -> None:

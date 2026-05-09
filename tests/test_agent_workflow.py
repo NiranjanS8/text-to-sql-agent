@@ -2,6 +2,8 @@ from pathlib import Path
 
 from text_to_sql_agent.agent_workflow import (
     create_sql_correction_tool,
+    create_sql_explanation_tool,
+    create_final_answer_tool,
     create_schema_context_tool,
     create_sql_execution_tool,
     create_sql_validation_tool,
@@ -55,6 +57,8 @@ def test_run_agent_pipeline_uses_structured_steps(tmp_path: Path, monkeypatch) -
     assert result.to_dict()["data"] == [{"name": "Meera Iyer"}, {"name": "Kabir Khan"}]
     assert result.to_dict()["original_sql"] == result.generated_sql
     assert result.to_dict()["corrected_sql"] == []
+    assert result.to_dict()["explanation"] == result.explanation
+    assert result.to_dict()["final_answer"] == "Found 2 matching rows for: Show Java students"
 
 
 def test_run_agent_pipeline_corrects_sql_execution_errors(tmp_path: Path, monkeypatch) -> None:
@@ -82,6 +86,7 @@ def test_run_agent_pipeline_corrects_sql_execution_errors(tmp_path: Path, monkey
     assert result.execution.status == "success"
     assert result.execution.row_count == 5
     assert result.to_dict()["data"][0] == {"name": "Aarav Sharma"}
+    assert result.to_dict()["final_answer"] == "Found 5 matching rows for: Show all student names"
 
 
 def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path, monkeypatch) -> None:
@@ -108,6 +113,7 @@ def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path
     assert result.execution.status == "sql_error"
     assert "missing_three" in str(result.execution.error)
     assert result.to_dict()["error"] == result.execution.error
+    assert "SQLite returned an error" in result.to_dict()["final_answer"]
 
 
 def test_sql_correction_tool_wraps_repair_function(monkeypatch) -> None:
@@ -125,3 +131,21 @@ def test_sql_correction_tool_wraps_repair_function(monkeypatch) -> None:
     )
 
     assert result == "SELECT name FROM students;"
+
+
+def test_explanation_and_final_answer_tools() -> None:
+    explanation = create_sql_explanation_tool().invoke({"sql": "SELECT name FROM students;"})
+    final_answer = create_final_answer_tool().invoke(
+        {
+            "result": {
+                "question": "Show students",
+                "sql": "SELECT name FROM students;",
+                "data": [{"name": "Aarav Sharma"}],
+                "row_count": 1,
+                "status": "success",
+            }
+        }
+    )
+
+    assert explanation == "This query reads the column(s) name from the students table."
+    assert final_answer == "Found 1 matching row for: Show students"
