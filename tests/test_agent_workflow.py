@@ -62,7 +62,7 @@ def test_run_agent_pipeline_uses_structured_steps(tmp_path: Path, monkeypatch) -
     assert result.to_dict()["original_sql"] == result.generated_sql
     assert result.to_dict()["corrected_sql"] == []
     assert result.to_dict()["explanation"] == result.explanation
-    assert result.to_dict()["final_answer"] == "Found 2 matching rows for: Show Java students"
+    assert result.to_dict()["final_answer"] == "Found 2 matching rows. First result: Meera Iyer."
 
 
 def test_run_agent_pipeline_corrects_sql_execution_errors(tmp_path: Path, monkeypatch) -> None:
@@ -90,7 +90,7 @@ def test_run_agent_pipeline_corrects_sql_execution_errors(tmp_path: Path, monkey
     assert result.execution.status == "success"
     assert result.execution.row_count == 10
     assert result.to_dict()["data"][0] == {"name": "Aarav Sharma"}
-    assert result.to_dict()["final_answer"] == "Found 10 matching rows for: Show all student names"
+    assert result.to_dict()["final_answer"] == "Found 10 matching rows. First result: Aarav Sharma."
 
 
 def test_run_agent_pipeline_corrects_overly_exact_empty_results(tmp_path: Path, monkeypatch) -> None:
@@ -285,4 +285,4 @@ def test_explanation_and_final_answer_tools() -> None:
     )
 
     assert explanation == "This query reads the column(s) name from the students table."
-    assert final_answer == "Found 1 matching row for: Show students"
+    assert final_answer == "Found 1 matching row. First result: Aarav Sharma."

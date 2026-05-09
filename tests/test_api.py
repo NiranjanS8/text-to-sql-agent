@@ -79,7 +79,7 @@ def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
     assert payload["explanation"] == (
         "This query reads the column(s) name, city from the students table and sorts the output."
     )
-    assert payload["final_answer"] == "Found 10 matching rows for: Show all students"
+    assert payload["final_answer"] == "Found 10 matching rows. First result: Aarav Sharma."
 
 
 def test_ask_endpoint_can_prepare_sql_for_approval(monkeypatch) -> None:

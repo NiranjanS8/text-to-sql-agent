@@ -66,6 +66,10 @@ The API and React UI support a human-in-the-loop execution path for safer agenti
 
 This demonstrates bounded tool use and human review before database actions.
 
+## Answer Summaries
+
+Final answers include lightweight result-aware summaries instead of only row counts. The formatter highlights useful signals such as highest pending amount, invoice balance, feature usage, course counts, or the first matching entity when the result shape is simple.
+
 ## Semantic Guardrails
 
 The agent applies semantic checks after SQL validation and before database execution. These guardrails catch cases where SQL is technically safe but likely wrong or risky:
