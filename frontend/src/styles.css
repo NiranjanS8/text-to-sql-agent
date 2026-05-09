@@ -382,6 +382,24 @@ textarea::placeholder {
   box-shadow: 0 0 4px rgba(220, 207, 192, 0.2);
 }
 
+.save-query-button {
+  justify-content: center;
+  min-height: 36px;
+  border: 1px solid var(--outline);
+  background: var(--surface-lowest);
+  color: var(--secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.save-query-button:hover {
+  border-color: var(--secondary);
+  color: var(--primary-hot);
+}
+
 .approve-button {
   border-color: var(--secondary);
   background: var(--secondary);
@@ -701,7 +719,8 @@ tbody tr:hover {
 }
 
 .schema-stack,
-.history-stack {
+.history-stack,
+.saved-query-stack {
   display: grid;
   gap: 4px;
   padding: 8px;
@@ -1046,6 +1065,66 @@ summary em,
   background: #121412;
 }
 
+.history-section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px 6px;
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.history-section-title em {
+  color: var(--secondary);
+  font-style: normal;
+}
+
+.saved-query-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 6px;
+}
+
+.saved-query-item button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.saved-query-item button:first-child {
+  padding: 10px;
+  border-bottom-color: var(--outline);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.saved-query-item button:first-child:hover {
+  border-color: var(--secondary);
+  background: #121412;
+  color: var(--text);
+}
+
+.saved-query-item .remove-saved {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  border-color: var(--outline);
+  color: var(--outline-bright);
+  font-family: "JetBrains Mono", monospace;
+  text-align: center;
+}
+
+.saved-query-item .remove-saved:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
 .history-stack strong {
   color: var(--muted);
   font-size: 13px;
@@ -1152,7 +1231,8 @@ summary em,
   }
 
   .run-button,
-  .approve-button {
+  .approve-button,
+  .save-query-button {
     width: 100%;
   }
 }

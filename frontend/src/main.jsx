@@ -28,6 +28,12 @@ const sampleQuestions = [
   "Which students are enrolled in more than one course?",
 ];
 
+const defaultSavedQueries = [
+  "Which SaaS customers have overdue invoice balance?",
+  "Which organizations have the highest AI SQL Copilot adoption?",
+  "Show students with partial payments and pending amount",
+];
+
 const schemaRelationships = [
   ["students", "enrollments", "id -> student_id"],
   ["courses", "enrollments", "id -> course_id"],
@@ -111,6 +117,7 @@ function App() {
   const [isSchemaOpen, setIsSchemaOpen] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [requireApproval, setRequireApproval] = useState(false);
+  const [savedQueries, setSavedQueries] = useState(() => loadSavedQueries());
 
   useEffect(() => {
     loadHealth();
@@ -219,6 +226,21 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  function saveCurrentQuestion() {
+    const trimmed = question.trim();
+    if (!trimmed) return;
+    updateSavedQueries([trimmed, ...savedQueries.filter((saved) => saved !== trimmed)].slice(0, 12));
+  }
+
+  function removeSavedQuery(savedQuestion) {
+    updateSavedQueries(savedQueries.filter((saved) => saved !== savedQuestion));
+  }
+
+  function updateSavedQueries(nextQueries) {
+    setSavedQueries(nextQueries);
+    window.localStorage.setItem("textToSqlSavedQueries", JSON.stringify(nextQueries));
+  }
+
   return (
     <div className="app-shell">
       <nav className="top-nav">
@@ -273,6 +295,9 @@ function App() {
                     ))}
                   </div>
                   <div className="execution-controls">
+                    <button className="save-query-button" type="button" onClick={saveCurrentQuestion}>
+                      Save query
+                    </button>
                     <label className="approval-toggle">
                       <input
                         type="checkbox"
@@ -308,8 +333,11 @@ function App() {
 
         <HistoryPanel
           records={history}
+          savedQueries={savedQueries}
           onRefresh={loadHistory}
           onSelect={(record) => setQuestion(record.question)}
+          onSelectSaved={(saved) => setQuestion(saved)}
+          onRemoveSaved={removeSavedQuery}
           isOpen={isHistoryOpen}
           onToggle={() => setIsHistoryOpen((value) => !value)}
         />
@@ -337,6 +365,15 @@ async function readApiResponse(response) {
       ? text
       : "The server returned an unexpected response. Please try again or check the backend logs.",
   };
+}
+
+function loadSavedQueries() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem("textToSqlSavedQueries") || "null");
+    return Array.isArray(stored) && stored.length ? stored : defaultSavedQueries;
+  } catch {
+    return defaultSavedQueries;
+  }
 }
 
 function StatusPill({ health }) {
@@ -764,7 +801,7 @@ function fallbackNodePosition(table, tableNames) {
   };
 }
 
-function HistoryPanel({ records, onRefresh, onSelect, isOpen, onToggle }) {
+function HistoryPanel({ records, savedQueries, onRefresh, onSelect, onSelectSaved, onRemoveSaved, isOpen, onToggle }) {
   return (
     <aside className={`history-rail ${isOpen ? "" : "is-collapsed"}`}>
       <CollapsedRailButton
@@ -791,6 +828,26 @@ function HistoryPanel({ records, onRefresh, onSelect, isOpen, onToggle }) {
         <div className="rail-summary">
           <strong>{records.length}</strong>
           <span>recent runs</span>
+        </div>
+        <div className="history-section-title">
+          <span>Saved collection</span>
+          <em>{savedQueries.length}</em>
+        </div>
+        <div className="saved-query-stack">
+          {savedQueries.map((saved) => (
+            <div className="saved-query-item" key={saved}>
+              <button type="button" onClick={() => onSelectSaved(saved)}>
+                {saved}
+              </button>
+              <button type="button" className="remove-saved" onClick={() => onRemoveSaved(saved)} title="Remove saved query">
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="history-section-title">
+          <span>Recent history</span>
+          <em>{records.length}</em>
         </div>
         <div className="history-stack">
           {records.length ? (

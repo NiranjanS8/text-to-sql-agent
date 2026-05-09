@@ -74,6 +74,10 @@ Final answers include lightweight result-aware summaries instead of only row cou
 
 The Results panel can export the current table as a CSV file. Filenames are generated from the natural-language question so saved results are easy to recognize.
 
+## Saved Query Collections
+
+The React UI includes a local saved-query collection in the History rail. Users can save the current natural-language question, rerun saved SaaS or education prompts, and remove saved prompts without changing backend data.
+
 ## Semantic Guardrails
 
 The agent applies semantic checks after SQL validation and before database execution. These guardrails catch cases where SQL is technically safe but likely wrong or risky:
