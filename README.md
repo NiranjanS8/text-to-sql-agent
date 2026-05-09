@@ -31,3 +31,16 @@ The evaluator runs a curated set of natural-language questions through the agent
 
 Default cases cover joins, aggregations, partial payments, top-N queries, empty-result recovery, and impossible-threshold edge cases such as asking for students enrolled in more courses than exist in the database.
 
+## Schema RAG
+
+SQL generation and correction use a lightweight retrieval layer over schema notes, business rules, and live database values. The agent receives the full SQLite schema plus only the most relevant guidance for the question, such as:
+
+- course title matching with `LIKE`
+- student enrollment joins
+- pending amount calculation
+- revenue aggregation paths
+- valid status values
+- known course titles, categories, cities, and total course count
+
+This keeps prompts grounded in domain knowledge while preserving a simple local setup.
+

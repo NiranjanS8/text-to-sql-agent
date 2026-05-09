@@ -50,6 +50,8 @@ def test_run_agent_pipeline_uses_structured_steps(tmp_path: Path, monkeypatch) -
     result = run_agent_pipeline("Show Java students", settings=settings)
 
     assert "courses(" in result.schema_context
+    assert "Retrieved business rules:" in result.schema_context
+    assert "Course title matching" in result.schema_context
     assert result.validation.is_safe is True
     assert result.validated_sql.endswith(";")
     assert result.execution.status == "success"

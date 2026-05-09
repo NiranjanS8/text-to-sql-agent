@@ -13,6 +13,7 @@ from text_to_sql_agent.edge_cases import (
 )
 from text_to_sql_agent.query_executor import QueryExecutionResult, execute_sql
 from text_to_sql_agent.response_formatter import build_final_answer, explain_sql
+from text_to_sql_agent.schema_rag import build_retrieved_schema_context
 from text_to_sql_agent.sql_generator import correct_sql, generate_sql
 from text_to_sql_agent.sql_validator import ValidationResult, validate_sql
 
@@ -121,7 +122,6 @@ def run_agent_pipeline(
     active_settings = settings or get_settings()
     database_path = active_settings.database_path
 
-    schema_tool = create_schema_context_tool(database_path)
     generation_tool = create_sql_generation_tool(active_settings)
     validation_tool = create_sql_validation_tool()
     execution_tool = create_sql_execution_tool(database_path)
@@ -129,7 +129,7 @@ def run_agent_pipeline(
     explanation_tool = create_sql_explanation_tool()
     final_answer_tool = create_final_answer_tool()
 
-    schema_context = schema_tool.invoke({})
+    schema_context = build_retrieved_schema_context(question, database_path)
     generated_sql = generation_tool.invoke({"question": question})
     hinted_sql = apply_question_sql_hints(question, generated_sql)
     validation = validation_tool.invoke({"sql": hinted_sql})

@@ -1,0 +1,166 @@
+import re
+import sqlite3
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
+
+from text_to_sql_agent.database import format_schema_for_prompt, get_connection
+
+
+@dataclass(frozen=True)
+class BusinessRule:
+    id: str
+    title: str
+    content: str
+    keywords: tuple[str, ...]
+
+
+BUSINESS_RULES: tuple[BusinessRule, ...] = (
+    BusinessRule(
+        id="course_title_matching",
+        title="Course title matching",
+        content=(
+            "Course names live in courses.title. User phrases such as Java course, SQL course, "
+            "or AI course may be partial names, so prefer courses.title LIKE '%term%' unless the exact title is known."
+        ),
+        keywords=("course", "courses", "title", "java", "python", "sql", "ai", "cloud", "web"),
+    ),
+    BusinessRule(
+        id="student_course_enrollment",
+        title="Student enrollments",
+        content=(
+            "A student is enrolled in a course through enrollments.student_id and enrollments.course_id. "
+            "Questions about students in courses require joining students -> enrollments -> courses."
+        ),
+        keywords=("student", "students", "enrolled", "enrollment", "course", "courses"),
+    ),
+    BusinessRule(
+        id="multi_course_counts",
+        title="Counting courses per student",
+        content=(
+            "For questions like students enrolled in more than N courses, group by students.id and students.name, "
+            "count enrollments.course_id, and compare the requested N against the total number of rows in courses."
+        ),
+        keywords=("more", "than", "count", "counts", "many", "multiple", "course", "courses", "enrolled"),
+    ),
+    BusinessRule(
+        id="payments_pending_amount",
+        title="Pending amount",
+        content=(
+            "Pending amount means courses.fee - payments.amount for the payment linked to an enrollment. "
+            "Partial payments are represented by payments.status = 'partial'."
+        ),
+        keywords=("payment", "payments", "paid", "partial", "pending", "amount", "fee", "balance"),
+    ),
+    BusinessRule(
+        id="course_revenue",
+        title="Course revenue",
+        content=(
+            "Course or category revenue should use SUM(payments.amount) joined through payments.enrollment_id "
+            "to enrollments.id and enrollments.course_id to courses.id."
+        ),
+        keywords=("revenue", "earned", "money", "income", "category", "categories", "course", "payments"),
+    ),
+    BusinessRule(
+        id="status_domains",
+        title="Status columns",
+        content=(
+            "Enrollment status values are active, completed, cancelled, and partial. "
+            "Payment status values are paid, partial, and refunded. Choose the status column that matches the question."
+        ),
+        keywords=("status", "active", "completed", "cancelled", "paid", "partial", "refunded"),
+    ),
+    BusinessRule(
+        id="date_filters",
+        title="Date filters",
+        content=(
+            "Date columns use ISO text dates: students.joined_on, enrollments.enrolled_on, and payments.paid_on. "
+            "Use BETWEEN or >= and <= for date ranges."
+        ),
+        keywords=("date", "dates", "joined", "enrolled", "paid", "before", "after", "between", "month", "year"),
+    ),
+    BusinessRule(
+        id="top_bottom_queries",
+        title="Top and bottom queries",
+        content=(
+            "Top, highest, lowest, and bottom questions need ORDER BY plus LIMIT. "
+            "If the user does not specify a number, return the top 10."
+        ),
+        keywords=("top", "highest", "lowest", "bottom", "best", "most", "least", "rank"),
+    ),
+)
+
+
+def build_retrieved_schema_context(question: str, database_path: Path | None = None, limit: int = 5) -> str:
+    schema = format_schema_for_prompt(database_path)
+    rules = retrieve_business_rules(question, limit=limit)
+    values = retrieve_relevant_values(question, database_path)
+
+    sections = ["Schema:", schema]
+    if rules:
+        sections.extend(["", "Retrieved business rules:"])
+        sections.extend(f"- {rule.title}: {rule.content}" for rule in rules)
+    if values:
+        sections.extend(["", "Retrieved database values:"])
+        sections.extend(f"- {line}" for line in values)
+    return "\n".join(sections)
+
+
+def retrieve_business_rules(question: str, limit: int = 5) -> list[BusinessRule]:
+    tokens = _tokenize(question)
+    scored_rules = [
+        (_score_rule(tokens, rule), index, rule)
+        for index, rule in enumerate(BUSINESS_RULES)
+    ]
+    return [
+        rule
+        for score, _, rule in sorted(scored_rules, key=lambda item: (-item[0], item[1]))
+        if score > 0
+    ][:limit]
+
+
+def retrieve_relevant_values(question: str, database_path: Path | None = None) -> list[str]:
+    tokens = _tokenize(question)
+    values: list[str] = []
+
+    if tokens & {"course", "courses", "java", "python", "sql", "ai", "cloud", "web", "analytics"}:
+        values.append("Known course titles: " + ", ".join(_distinct_values("courses", "title", database_path)))
+        values.append("Known course categories: " + ", ".join(_distinct_values("courses", "category", database_path)))
+    if tokens & {"city", "cities", "from", "location", "delhi", "chennai", "mumbai", "pune"}:
+        values.append("Known student cities: " + ", ".join(_distinct_values("students", "city", database_path)))
+    if tokens & {"status", "active", "completed", "cancelled", "paid", "partial", "refunded"}:
+        values.append("Known enrollment statuses: " + ", ".join(_distinct_values("enrollments", "status", database_path)))
+        values.append("Known payment statuses: " + ", ".join(_distinct_values("payments", "status", database_path)))
+    if tokens & {"more", "than", "course", "courses", "enrolled"}:
+        total_courses = _count_rows("courses", database_path)
+        values.append(f"Total courses available: {total_courses}")
+
+    return values
+
+
+def _tokenize(text: str) -> set[str]:
+    return {token.lower() for token in re.findall(r"[A-Za-z0-9]+", text)}
+
+
+def _score_rule(tokens: set[str], rule: BusinessRule) -> int:
+    return len(tokens.intersection(rule.keywords))
+
+
+def _distinct_values(table: str, column: str, database_path: Path | None) -> Sequence[str]:
+    try:
+        with get_connection(database_path) as connection:
+            rows = connection.execute(
+                f"SELECT DISTINCT {column} AS value FROM {table} ORDER BY {column};"
+            ).fetchall()
+    except sqlite3.Error:
+        return ()
+    return tuple(str(row["value"]) for row in rows)
+
+
+def _count_rows(table: str, database_path: Path | None) -> int:
+    try:
+        with get_connection(database_path) as connection:
+            row = connection.execute(f"SELECT COUNT(*) AS count FROM {table};").fetchone()
+    except sqlite3.Error:
+        return 0
+    return int(row["count"] if row else 0)
