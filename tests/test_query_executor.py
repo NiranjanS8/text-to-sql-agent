@@ -34,8 +34,8 @@ def test_execute_sql_handles_empty_results(tmp_path: Path) -> None:
     initialize_database(database_path)
 
     result = execute_sql(
-        question="Show students from Jaipur",
-        sql="SELECT name FROM students WHERE city = 'Jaipur';",
+        question="Show students from Indore",
+        sql="SELECT name FROM students WHERE city = 'Indore';",
         database_path=database_path,
     )
 
@@ -73,4 +73,3 @@ def test_execute_sql_handles_sql_errors(tmp_path: Path) -> None:
     assert result.status == "sql_error"
     assert "missing_column" in str(result.error)
     assert result.data == []
-

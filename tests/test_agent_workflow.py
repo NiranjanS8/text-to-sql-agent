@@ -27,7 +27,7 @@ def test_langchain_tools_wrap_schema_validation_and_execution(tmp_path: Path) ->
     assert validation.is_safe is True
     assert validation.sql == "SELECT name FROM students;"
     assert execution.status == "success"
-    assert execution.row_count == 5
+    assert execution.row_count == 10
 
 
 def test_run_agent_pipeline_uses_structured_steps(tmp_path: Path, monkeypatch) -> None:
@@ -84,9 +84,9 @@ def test_run_agent_pipeline_corrects_sql_execution_errors(tmp_path: Path, monkey
     assert result.corrected_sql == ["SELECT name FROM students ORDER BY id;"]
     assert result.retry_count == 1
     assert result.execution.status == "success"
-    assert result.execution.row_count == 5
+    assert result.execution.row_count == 10
     assert result.to_dict()["data"][0] == {"name": "Aarav Sharma"}
-    assert result.to_dict()["final_answer"] == "Found 5 matching rows for: Show all student names"
+    assert result.to_dict()["final_answer"] == "Found 10 matching rows for: Show all student names"
 
 
 def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path, monkeypatch) -> None:

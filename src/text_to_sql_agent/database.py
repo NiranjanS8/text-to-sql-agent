@@ -56,33 +56,57 @@ CREATE TABLE IF NOT EXISTS query_history (
 
 SAMPLE_ROWS: dict[str, list[tuple[Any, ...]]] = {
     "students": [
-        ("Aarav Sharma", "aarav@example.com", "Delhi", "2025-01-10"),
-        ("Meera Iyer", "meera@example.com", "Chennai", "2025-02-03"),
-        ("Kabir Khan", "kabir@example.com", "Mumbai", "2025-02-20"),
-        ("Ananya Rao", "ananya@example.com", "Bengaluru", "2025-03-12"),
-        ("Riya Patel", "riya@example.com", "Ahmedabad", "2025-04-01"),
+        (1, "Aarav Sharma", "aarav@example.com", "Delhi", "2025-01-10"),
+        (2, "Meera Iyer", "meera@example.com", "Chennai", "2025-02-03"),
+        (3, "Kabir Khan", "kabir@example.com", "Mumbai", "2025-02-20"),
+        (4, "Ananya Rao", "ananya@example.com", "Bengaluru", "2025-03-12"),
+        (5, "Riya Patel", "riya@example.com", "Ahmedabad", "2025-04-01"),
+        (6, "Dev Malhotra", "dev@example.com", "Pune", "2025-04-18"),
+        (7, "Nisha Verma", "nisha@example.com", "Hyderabad", "2025-05-02"),
+        (8, "Ishaan Gupta", "ishaan@example.com", "Kolkata", "2025-05-17"),
+        (9, "Sara Thomas", "sara@example.com", "Kochi", "2025-06-01"),
+        (10, "Vikram Singh", "vikram@example.com", "Jaipur", "2025-06-14"),
     ],
     "courses": [
-        ("Python Basics", "Programming", 12000),
-        ("Java Masterclass", "Programming", 15000),
-        ("Data Analytics", "Data", 18000),
-        ("Cloud Fundamentals", "Cloud", 16000),
+        (1, "Python Basics", "Programming", 12000),
+        (2, "Java Masterclass", "Programming", 15000),
+        (3, "Data Analytics", "Data", 18000),
+        (4, "Cloud Fundamentals", "Cloud", 16000),
+        (5, "SQL for Analytics", "Data", 14000),
+        (6, "AI Foundations", "Artificial Intelligence", 22000),
+        (7, "Web Development", "Programming", 17000),
     ],
     "enrollments": [
-        (1, 1, "2025-01-15", "active"),
-        (2, 2, "2025-02-07", "active"),
-        (3, 2, "2025-02-25", "completed"),
-        (4, 3, "2025-03-15", "active"),
-        (5, 4, "2025-04-05", "cancelled"),
-        (1, 3, "2025-04-10", "active"),
+        (1, 1, 1, "2025-01-15", "active"),
+        (2, 2, 2, "2025-02-07", "active"),
+        (3, 3, 2, "2025-02-25", "completed"),
+        (4, 4, 3, "2025-03-15", "active"),
+        (5, 5, 4, "2025-04-05", "cancelled"),
+        (6, 1, 3, "2025-04-10", "active"),
+        (7, 6, 5, "2025-04-22", "active"),
+        (8, 7, 6, "2025-05-05", "active"),
+        (9, 8, 7, "2025-05-20", "active"),
+        (10, 9, 1, "2025-06-03", "completed"),
+        (11, 10, 5, "2025-06-16", "active"),
+        (12, 2, 6, "2025-06-20", "active"),
+        (13, 4, 7, "2025-06-25", "partial"),
+        (14, 8, 3, "2025-07-01", "active"),
     ],
     "payments": [
-        (1, 12000, "2025-01-15", "card", "paid"),
-        (2, 15000, "2025-02-07", "upi", "paid"),
-        (3, 15000, "2025-02-25", "bank_transfer", "paid"),
-        (4, 9000, "2025-03-16", "card", "partial"),
-        (5, 0, "2025-04-05", "none", "refunded"),
-        (6, 18000, "2025-04-10", "upi", "paid"),
+        (1, 1, 12000, "2025-01-15", "card", "paid"),
+        (2, 2, 15000, "2025-02-07", "upi", "paid"),
+        (3, 3, 15000, "2025-02-25", "bank_transfer", "paid"),
+        (4, 4, 9000, "2025-03-16", "card", "partial"),
+        (5, 5, 0, "2025-04-05", "none", "refunded"),
+        (6, 6, 18000, "2025-04-10", "upi", "paid"),
+        (7, 7, 14000, "2025-04-22", "upi", "paid"),
+        (8, 8, 22000, "2025-05-05", "card", "paid"),
+        (9, 9, 17000, "2025-05-20", "bank_transfer", "paid"),
+        (10, 10, 12000, "2025-06-03", "card", "paid"),
+        (11, 11, 7000, "2025-06-16", "upi", "partial"),
+        (12, 12, 22000, "2025-06-20", "card", "paid"),
+        (13, 13, 8500, "2025-06-25", "upi", "partial"),
+        (14, 14, 18000, "2025-07-01", "bank_transfer", "paid"),
     ],
 }
 
@@ -106,30 +130,28 @@ def initialize_database(database_path: Path | None = None) -> None:
         _seed_table(
             connection,
             "students",
-            "INSERT OR IGNORE INTO students (name, email, city, joined_on) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO students (id, name, email, city, joined_on) VALUES (?, ?, ?, ?, ?)",
         )
         _seed_table(
             connection,
             "courses",
-            "INSERT OR IGNORE INTO courses (title, category, fee) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO courses (id, title, category, fee) VALUES (?, ?, ?, ?)",
         )
         _seed_table(
             connection,
             "enrollments",
-            "INSERT OR IGNORE INTO enrollments (student_id, course_id, enrolled_on, status) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO enrollments (id, student_id, course_id, enrolled_on, status) VALUES (?, ?, ?, ?, ?)",
         )
         _seed_table(
             connection,
             "payments",
-            "INSERT OR IGNORE INTO payments (enrollment_id, amount, paid_on, method, status) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO payments (id, enrollment_id, amount, paid_on, method, status) VALUES (?, ?, ?, ?, ?, ?)",
         )
         connection.commit()
 
 
 def _seed_table(connection: sqlite3.Connection, table: str, sql: str) -> None:
-    existing_count = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-    if existing_count == 0:
-        connection.executemany(sql, SAMPLE_ROWS[table])
+    connection.executemany(sql, SAMPLE_ROWS[table])
 
 
 def get_table_names(database_path: Path | None = None) -> list[str]:
