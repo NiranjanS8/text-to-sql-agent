@@ -592,13 +592,15 @@ pre {
 }
 
 .results-panel {
-  min-height: 300px;
+  min-height: 360px;
   overflow: hidden;
+  border-color: rgba(162, 175, 155, 0.42);
+  box-shadow: 0 0 0 1px rgba(162, 175, 155, 0.08);
 }
 
 .table-frame {
   overflow: auto;
-  max-height: 420px;
+  max-height: 460px;
   background: var(--bg);
 }
 

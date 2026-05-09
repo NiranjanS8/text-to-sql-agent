@@ -176,11 +176,11 @@ function App() {
               </form>
             </section>
 
+            <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
             <section className="analysis-grid">
               <SqlPanel answer={answer} onCopy={copySql} copied={copied} />
               <AnswerPanel answer={answer} isLoading={isLoading} />
             </section>
-            <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
           </div>
         </section>
 
