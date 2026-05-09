@@ -4,6 +4,7 @@ from text_to_sql_agent.database import initialize_database
 from text_to_sql_agent.edge_cases import (
     apply_question_sql_hints,
     resolve_empty_result_edge_case,
+    resolve_semantic_guardrail,
     resolve_validation_edge_case,
 )
 from text_to_sql_agent.sql_validator import validate_sql
@@ -106,3 +107,75 @@ def test_resolve_unsafe_write_request_returns_readonly_preview(tmp_path: Path) -
     assert result.status == "edge_case"
     assert "read-only" in str(result.message)
     assert result.data[0]["status"] in {"cancelled", "completed", "partial"}
+
+
+def test_semantic_guardrail_redacts_unrequested_student_email(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    result = resolve_semantic_guardrail(
+        "Show all students",
+        "SELECT name, email FROM students ORDER BY id;",
+        database_path=database_path,
+    )
+
+    assert result is not None
+    assert result.status == "edge_case"
+    assert "avoided exposing student email" in str(result.message)
+    assert "email" not in result.data[0]
+    assert result.data[0] == {"name": "Aarav Sharma", "city": "Delhi", "joined_on": "2025-01-10"}
+
+
+def test_semantic_guardrail_allows_requested_student_email(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    result = resolve_semantic_guardrail(
+        "Show student email addresses",
+        "SELECT name, email FROM students ORDER BY id;",
+        database_path=database_path,
+    )
+
+    assert result is None
+
+
+def test_semantic_guardrail_blocks_ambiguous_ranking() -> None:
+    result = resolve_semantic_guardrail(
+        "Show top students",
+        "SELECT name FROM students LIMIT 10;",
+    )
+
+    assert result is not None
+    assert result.status == "edge_case"
+    assert "Please specify the metric" in str(result.message)
+
+
+def test_semantic_guardrail_catches_payment_query_without_payments_table(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    result = resolve_semantic_guardrail(
+        "Show students with partial payments",
+        "SELECT students.name FROM students ORDER BY students.name;",
+        database_path=database_path,
+    )
+
+    assert result is not None
+    assert result.status == "edge_case"
+    assert "did not reference the payments table" in str(result.message)
+    assert {"name": "Ishaan Gupta", "title": "Data Analytics", "amount": 18000, "status": "paid", "paid_on": "2025-07-01"} in result.data
+
+
+def test_semantic_guardrail_catches_invalid_status_filter(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+
+    result = resolve_semantic_guardrail(
+        "Show failed payments",
+        "SELECT amount FROM payments WHERE payments.status = 'failed';",
+        database_path=database_path,
+    )
+
+    assert result is not None
+    assert result.status == "edge_case"
+    assert "Available payments statuses" in str(result.message)

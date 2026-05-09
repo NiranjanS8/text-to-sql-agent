@@ -54,6 +54,18 @@ The API and React UI support a human-in-the-loop execution path for safer agenti
 
 This demonstrates bounded tool use and human review before database actions.
 
+## Semantic Guardrails
+
+The agent applies semantic checks after SQL validation and before database execution. These guardrails catch cases where SQL is technically safe but likely wrong or risky:
+
+- blocks unrequested student email exposure and returns safe student fields
+- asks for a clearer metric when ranking questions such as "top students" are ambiguous
+- detects payment/revenue questions when generated SQL forgot the `payments` table
+- catches invalid generated status filters and returns available domain values
+- preserves existing empty-result recovery for impossible thresholds, unknown courses, unknown cities, and out-of-range dates
+
+This gives the project a stronger applied-AI safety story: query execution is bounded not only by syntax, but also by domain intent.
+
 ## Docker Deployment
 
 Create a local env file:

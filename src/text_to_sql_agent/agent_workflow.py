@@ -9,6 +9,7 @@ from text_to_sql_agent.database import format_schema_for_prompt
 from text_to_sql_agent.edge_cases import (
     apply_question_sql_hints,
     resolve_empty_result_edge_case,
+    resolve_semantic_guardrail,
     resolve_validation_edge_case,
 )
 from text_to_sql_agent.query_executor import QueryExecutionResult, execute_sql
@@ -163,7 +164,12 @@ def execute_approved_sql(question: str, sql: str, settings: Settings | None = No
     schema_context = build_retrieved_schema_context(question, database_path)
     validation = validation_tool.invoke({"sql": sql})
     sql_to_execute = validation.sql if validation.is_safe else sql
-    execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+    execution = None
+
+    if validation.is_safe:
+        execution = resolve_semantic_guardrail(question, sql_to_execute, database_path)
+    if execution is None:
+        execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
 
     if execution.status == "validation_error":
         edge_case_result = resolve_validation_edge_case(question, validation, database_path)
@@ -213,7 +219,11 @@ def run_agent_pipeline(
     hinted_sql = apply_question_sql_hints(question, generated_sql)
     validation = validation_tool.invoke({"sql": hinted_sql})
     sql_to_execute = validation.sql if validation.is_safe else generated_sql
-    execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+    execution = None
+    if validation.is_safe:
+        execution = resolve_semantic_guardrail(question, sql_to_execute, database_path)
+    if execution is None:
+        execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
     corrected_sql: list[str] = []
 
     if execution.status == "validation_error":
@@ -234,7 +244,11 @@ def run_agent_pipeline(
         corrected_sql.append(repaired_sql)
         validation = validation_tool.invoke({"sql": repaired_sql})
         sql_to_execute = validation.sql if validation.is_safe else repaired_sql
-        execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+        execution = None
+        if validation.is_safe:
+            execution = resolve_semantic_guardrail(question, sql_to_execute, database_path)
+        if execution is None:
+            execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
         if not validation.is_safe:
             break
 
@@ -260,7 +274,11 @@ def run_agent_pipeline(
         corrected_sql.append(repaired_sql)
         validation = validation_tool.invoke({"sql": repaired_sql})
         sql_to_execute = validation.sql if validation.is_safe else repaired_sql
-        execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+        execution = None
+        if validation.is_safe:
+            execution = resolve_semantic_guardrail(question, sql_to_execute, database_path)
+        if execution is None:
+            execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
         if not validation.is_safe:
             break
 

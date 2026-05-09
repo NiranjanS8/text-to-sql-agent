@@ -174,6 +174,23 @@ def test_run_agent_pipeline_adds_limit_for_top_queries(tmp_path: Path, monkeypat
     assert result.execution.row_count == 10
 
 
+def test_run_agent_pipeline_applies_semantic_guardrail_before_execution(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    settings = Settings(DATABASE_URL=f"sqlite:///{database_path}")
+
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name, email FROM students ORDER BY id;",
+    )
+
+    result = run_agent_pipeline("Show all students", settings=settings)
+
+    assert result.execution.status == "edge_case"
+    assert "avoided exposing student email" in result.final_answer
+    assert "email" not in result.execution.data[0]
+
+
 def test_prepare_sql_for_approval_does_not_execute_query(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "sample.db"
     initialize_database(database_path)

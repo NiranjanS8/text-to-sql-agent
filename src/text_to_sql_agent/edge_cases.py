@@ -21,6 +21,8 @@ COURSE_TEXT_PATTERN = re.compile(
     r"\b(?:course|enrolled in|studying|taking)\s+([A-Za-z][A-Za-z\s]+?)(?:\?|$|\s+course\b)",
     flags=re.IGNORECASE,
 )
+SENSITIVE_STUDENT_COLUMNS = ("email",)
+RANKING_TERMS = ("top", "highest", "lowest", "bottom", "best", "worst", "most", "least")
 
 
 def apply_question_sql_hints(question: str, sql: str) -> str:
@@ -69,6 +71,24 @@ def resolve_empty_result_edge_case(
     )
     for resolver in resolvers:
         result = resolver(question, database_path)
+        if result:
+            return result
+    return None
+
+
+def resolve_semantic_guardrail(
+    question: str,
+    sql: str,
+    database_path: Path | None = None,
+) -> QueryExecutionResult | None:
+    resolvers = (
+        _resolve_sensitive_student_data_request,
+        _resolve_ambiguous_ranking_request,
+        _resolve_payment_query_without_payment_join,
+        _resolve_status_filter_mismatch,
+    )
+    for resolver in resolvers:
+        result = resolver(question, sql, database_path)
         if result:
             return result
     return None
@@ -128,6 +148,133 @@ def _resolve_payment_threshold_request(question: str, database_path: Path | None
     message = (
         f"The highest payment amount in the database is {max_amount}, so there are no payments above "
         f"{requested_amount}. Here are the largest payments instead."
+    )
+    return _with_edge_message(result, message)
+
+
+def _resolve_sensitive_student_data_request(
+    question: str,
+    sql: str,
+    database_path: Path | None,
+) -> QueryExecutionResult | None:
+    lowered_question = question.lower()
+    lowered_sql = cleanup_sql(sql).lower()
+    asks_for_contact = any(term in lowered_question for term in ("email", "contact", "contacts"))
+    exposes_email = any(re.search(rf"\b{column}\b", lowered_sql) for column in SENSITIVE_STUDENT_COLUMNS)
+    selects_all_students = re.search(r"\bselect\s+\*\s+from\s+students\b", lowered_sql) is not None
+
+    if asks_for_contact or not (exposes_email or selects_all_students):
+        return None
+
+    safe_sql = "SELECT name, city, joined_on FROM students ORDER BY id LIMIT 10;"
+    result = execute_sql(question=question, sql=safe_sql, database_path=database_path)
+    message = (
+        "I avoided exposing student email addresses because the question did not ask for contact data. "
+        "Here are safe student fields instead."
+    )
+    return _with_edge_message(result, message)
+
+
+def _resolve_ambiguous_ranking_request(
+    question: str,
+    sql: str,
+    database_path: Path | None,
+) -> QueryExecutionResult | None:
+    lowered_question = question.lower()
+    lowered_sql = cleanup_sql(sql).lower()
+    asks_for_ranking = any(re.search(rf"\b{term}\b", lowered_question) for term in RANKING_TERMS)
+    has_metric = " by " in lowered_question or any(
+        term in lowered_question
+        for term in ("fee", "amount", "payment", "revenue", "course", "courses", "date", "name", "enrollment")
+    )
+
+    if not asks_for_ranking or has_metric:
+        return None
+    if any(term in lowered_sql for term in ("count(", "sum(", "avg(", "order by")) and " order by " in lowered_sql:
+        return None
+
+    result = QueryExecutionResult(
+        question=question,
+        sql=cleanup_sql(sql),
+        status="edge_case",
+        message=(
+            "The ranking request is ambiguous. Please specify the metric, such as course count, payment amount, "
+            "revenue, joined date, or name."
+        ),
+    )
+    return result
+
+
+def _resolve_payment_query_without_payment_join(
+    question: str,
+    sql: str,
+    database_path: Path | None,
+) -> QueryExecutionResult | None:
+    lowered_question = question.lower()
+    lowered_sql = cleanup_sql(sql).lower()
+    asks_payment_metric = any(
+        term in lowered_question for term in ("payment", "payments", "paid", "pending", "amount", "revenue", "earned", "money")
+    )
+
+    if not asks_payment_metric or "payments" in lowered_sql:
+        return None
+
+    sql_preview = """
+    SELECT students.name, courses.title, payments.amount, payments.status, payments.paid_on
+    FROM payments
+    JOIN enrollments ON enrollments.id = payments.enrollment_id
+    JOIN students ON students.id = enrollments.student_id
+    JOIN courses ON courses.id = enrollments.course_id
+    ORDER BY payments.paid_on DESC
+    LIMIT 5;
+    """
+    result = execute_sql(question=question, sql=sql_preview, database_path=database_path)
+    message = (
+        "The generated SQL did not reference the payments table even though the question asks about payment or "
+        "revenue data. Showing a safe payments preview instead."
+    )
+    return _with_edge_message(result, message)
+
+
+def _resolve_status_filter_mismatch(
+    question: str,
+    sql: str,
+    database_path: Path | None,
+) -> QueryExecutionResult | None:
+    lowered_question = question.lower()
+    lowered_sql = cleanup_sql(sql).lower()
+    status_match = re.search(r"\b(enrollments|payments)\.status\s*=\s*'([^']+)'", lowered_sql)
+    if not status_match:
+        return None
+
+    table, requested_status = status_match.groups()
+    available = _distinct_values(table, "status", database_path)
+    if any(requested_status == status.lower() for status in available):
+        return None
+
+    if table == "payments":
+        sql_preview = """
+        SELECT students.name, courses.title, payments.amount, payments.status, payments.paid_on
+        FROM payments
+        JOIN enrollments ON enrollments.id = payments.enrollment_id
+        JOIN students ON students.id = enrollments.student_id
+        JOIN courses ON courses.id = enrollments.course_id
+        ORDER BY payments.paid_on DESC
+        LIMIT 5;
+        """
+    else:
+        sql_preview = """
+        SELECT students.name, courses.title, enrollments.status, enrollments.enrolled_on
+        FROM enrollments
+        JOIN students ON students.id = enrollments.student_id
+        JOIN courses ON courses.id = enrollments.course_id
+        ORDER BY enrollments.enrolled_on DESC
+        LIMIT 5;
+        """
+    result = execute_sql(question=question, sql=sql_preview, database_path=database_path)
+    message = (
+        f"No {table} status named {requested_status} exists. Available {table} statuses are "
+        f"{', '.join(available)}. Showing recent {table} rows instead."
     )
     return _with_edge_message(result, message)
 
