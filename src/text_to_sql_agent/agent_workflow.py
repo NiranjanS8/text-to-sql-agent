@@ -7,7 +7,7 @@ from langchain_core.tools import StructuredTool
 from text_to_sql_agent.config import Settings, get_settings
 from text_to_sql_agent.database import format_schema_for_prompt
 from text_to_sql_agent.query_executor import QueryExecutionResult, execute_sql
-from text_to_sql_agent.sql_generator import generate_sql
+from text_to_sql_agent.sql_generator import correct_sql, generate_sql
 from text_to_sql_agent.sql_validator import ValidationResult, validate_sql
 
 
@@ -19,9 +19,15 @@ class AgentWorkflowResult:
     validated_sql: str
     validation: ValidationResult
     execution: QueryExecutionResult
+    corrected_sql: list[str]
+    retry_count: int
 
     def to_dict(self) -> dict[str, Any]:
-        return self.execution.to_dict()
+        response = self.execution.to_dict()
+        response["original_sql"] = self.generated_sql
+        response["corrected_sql"] = self.corrected_sql
+        response["retry_count"] = self.retry_count
+        return response
 
 
 def create_schema_context_tool(database_path: Path | None = None) -> StructuredTool:
@@ -67,7 +73,24 @@ def create_sql_execution_tool(database_path: Path | None = None) -> StructuredTo
     )
 
 
-def run_agent_pipeline(question: str, settings: Settings | None = None) -> AgentWorkflowResult:
+def create_sql_correction_tool(settings: Settings | None = None) -> StructuredTool:
+    active_settings = settings or get_settings()
+
+    def repair(question: str, failed_sql: str, error: str) -> str:
+        return correct_sql(question=question, failed_sql=failed_sql, error=error, settings=active_settings)
+
+    return StructuredTool.from_function(
+        func=repair,
+        name="sql_correction",
+        description="Repairs a failed SQLite SELECT query using the database schema and SQLite error.",
+    )
+
+
+def run_agent_pipeline(
+    question: str,
+    settings: Settings | None = None,
+    max_retries: int = 2,
+) -> AgentWorkflowResult:
     active_settings = settings or get_settings()
     database_path = active_settings.database_path
 
@@ -75,12 +98,31 @@ def run_agent_pipeline(question: str, settings: Settings | None = None) -> Agent
     generation_tool = create_sql_generation_tool(active_settings)
     validation_tool = create_sql_validation_tool()
     execution_tool = create_sql_execution_tool(database_path)
+    correction_tool = create_sql_correction_tool(active_settings)
 
     schema_context = schema_tool.invoke({})
     generated_sql = generation_tool.invoke({"question": question})
     validation = validation_tool.invoke({"sql": generated_sql})
     sql_to_execute = validation.sql if validation.is_safe else generated_sql
     execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+    corrected_sql: list[str] = []
+
+    retries_used = 0
+    while execution.status == "sql_error" and retries_used < max_retries:
+        retries_used += 1
+        repaired_sql = correction_tool.invoke(
+            {
+                "question": question,
+                "failed_sql": execution.sql,
+                "error": execution.error or "Unknown SQLite error.",
+            }
+        )
+        corrected_sql.append(repaired_sql)
+        validation = validation_tool.invoke({"sql": repaired_sql})
+        sql_to_execute = validation.sql if validation.is_safe else repaired_sql
+        execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+        if not validation.is_safe:
+            break
 
     return AgentWorkflowResult(
         question=question,
@@ -89,5 +131,6 @@ def run_agent_pipeline(question: str, settings: Settings | None = None) -> Agent
         validated_sql=validation.sql,
         validation=validation,
         execution=execution,
+        corrected_sql=corrected_sql,
+        retry_count=retries_used,
     )
-

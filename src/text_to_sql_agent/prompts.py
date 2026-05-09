@@ -27,3 +27,35 @@ SQL:
     ]
 )
 
+
+SQL_CORRECTION_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+You are a careful Text-to-SQL repair assistant for SQLite.
+Fix the SQL using only the provided schema and error message.
+Return exactly one SQL SELECT query and no prose.
+Do not wrap the query in Markdown.
+""".strip(),
+        ),
+        (
+            "human",
+            """
+Schema:
+{schema}
+
+Question:
+{question}
+
+Failed SQL:
+{failed_sql}
+
+SQLite error:
+{error}
+
+Corrected SQL:
+""".strip(),
+        ),
+    ]
+)
