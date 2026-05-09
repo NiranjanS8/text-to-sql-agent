@@ -1,7 +1,10 @@
 import logging
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from text_to_sql_agent.agent_workflow import run_agent_pipeline
@@ -19,12 +22,18 @@ def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
     initialize_database(settings.database_path)
+    static_dir = Path(__file__).resolve().parents[2] / "static"
 
     app = FastAPI(
         title="Text-to-SQL Agent",
         version="0.1.0",
         description="FastAPI backend for natural-language SQL over SQLite.",
     )
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    @app.get("/", tags=["ui"])
+    def index() -> FileResponse:
+        return FileResponse(static_dir / "index.html")
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:

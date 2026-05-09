@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Text-to-SQL Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="Text-to-SQL workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">SQLite classroom demo</p>
+            <h1>Text-to-SQL Agent</h1>
+          </div>
+          <div class="health-pill" id="healthStatus">Checking API</div>
+        </header>
+
+        <section class="ask-panel" aria-labelledby="askTitle">
+          <div class="ask-copy">
+            <h2 id="askTitle">Ask a database question</h2>
+            <p>Try questions about students, courses, enrollments, or payments.</p>
+          </div>
+          <form id="askForm" class="ask-form">
+            <label class="sr-only" for="questionInput">Question</label>
+            <textarea
+              id="questionInput"
+              name="question"
+              rows="3"
+              placeholder="Show all students enrolled in Java course"
+              required
+            ></textarea>
+            <div class="form-actions">
+              <button type="button" class="ghost-button" id="sampleButton">Use sample</button>
+              <button type="submit" class="primary-button" id="askButton">Run query</button>
+            </div>
+          </form>
+          <p class="error-line" id="errorLine" role="alert"></p>
+        </section>
+
+        <section class="answer-grid" aria-live="polite">
+          <article class="answer-band final-answer">
+            <span class="label">Final answer</span>
+            <p id="finalAnswer">Your answer will appear here after the first query.</p>
+          </article>
+
+          <article class="answer-band">
+            <span class="label">Generated SQL</span>
+            <pre><code id="sqlOutput">SELECT ...</code></pre>
+          </article>
+
+          <article class="answer-band">
+            <span class="label">Explanation</span>
+            <p id="explanationOutput">The agent will explain the SQL in plain English.</p>
+          </article>
+        </section>
+
+        <section class="results-section" aria-labelledby="resultsTitle">
+          <div class="section-heading">
+            <h2 id="resultsTitle">Results</h2>
+            <span id="rowCount">0 rows</span>
+          </div>
+          <div class="table-wrap" id="tableWrap">
+            <p class="empty-state">No result data yet.</p>
+          </div>
+        </section>
+      </section>
+
+      <aside class="side-rail" aria-label="Database context">
+        <section class="side-section">
+          <div class="section-heading">
+            <h2>Schema</h2>
+            <button type="button" class="icon-button" id="refreshSchemaButton" title="Refresh schema">Refresh</button>
+          </div>
+          <div id="schemaList" class="schema-list"></div>
+        </section>
+
+        <section class="side-section">
+          <div class="section-heading">
+            <h2>History</h2>
+            <button type="button" class="icon-button" id="refreshHistoryButton" title="Refresh history">Refresh</button>
+          </div>
+          <ol id="historyList" class="history-list"></ol>
+        </section>
+      </aside>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

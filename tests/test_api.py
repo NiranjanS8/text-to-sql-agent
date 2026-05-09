@@ -6,6 +6,14 @@ from text_to_sql_agent.main import app
 client = TestClient(app)
 
 
+def test_index_serves_demo_ui() -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Text-to-SQL Agent" in response.text
+    assert "/static/styles.css" in response.text
+
+
 def test_health_endpoint() -> None:
     response = client.get("/health")
 
