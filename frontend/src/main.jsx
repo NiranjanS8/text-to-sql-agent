@@ -6,6 +6,7 @@ import {
   Braces,
   Clipboard,
   Database,
+  FileDown,
   History,
   Loader2,
   Play,
@@ -32,6 +33,7 @@ function App() {
   const [health, setHealth] = useState("checking");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     loadHealth();
@@ -89,6 +91,14 @@ function App() {
     }
   }
 
+  async function copySql() {
+    const sql = answer?.sql || answer?.original_sql;
+    if (!sql) return;
+    await navigator.clipboard.writeText(sql);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
   return (
     <div className="app-shell">
       <nav className="top-nav">
@@ -111,48 +121,52 @@ function App() {
 
         <section className="data-canvas">
           <div className="canvas-inner">
-            <header className="canvas-header">
-              <div>
+            <section className="query-stage">
+              <div className="stage-copy">
                 <p className="kicker">Main cluster database</p>
-                <h1>Natural language SQL console</h1>
+                <h1>Ask, inspect, ship SQL</h1>
+                <PipelineStatus answer={answer} isLoading={isLoading} />
               </div>
-              <div className="execution-meter">
-                <span>{isLoading ? "GENERATING SQL" : answer?.status?.toUpperCase() || "STANDBY"}</span>
-              </div>
-            </header>
 
-            <form className="query-console" onSubmit={runQuery}>
-              <div className="input-row">
-                <Search size={20} aria-hidden="true" />
-                <textarea
-                  id="question"
-                  aria-label="Ask a database question"
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="Ask about students, courses, enrollments, or payments"
-                  rows={3}
-                />
-                <button className="run-button" type="submit" disabled={isLoading}>
-                  {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
-                  {isLoading ? "Running" : "Run query"}
-                </button>
-              </div>
-              <div className="sample-strip" aria-label="Sample questions">
-                {sampleQuestions.map((sample) => (
-                  <button key={sample} type="button" onClick={() => setQuestion(sample)}>
-                    {sample}
+              <form className="query-console" onSubmit={runQuery}>
+                <label htmlFor="question">Natural language prompt</label>
+                <div className="input-row">
+                  <Search size={20} aria-hidden="true" />
+                  <textarea
+                    id="question"
+                    aria-label="Ask a database question"
+                    value={question}
+                    onChange={(event) => setQuestion(event.target.value)}
+                    placeholder="Ask about students, courses, enrollments, or payments"
+                    rows={4}
+                  />
+                </div>
+                <div className="console-footer">
+                  <div className="sample-strip" aria-label="Sample questions">
+                    {sampleQuestions.map((sample) => (
+                      <button key={sample} type="button" onClick={() => setQuestion(sample)}>
+                        {sample}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="run-button" type="submit" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
+                    {isLoading ? "Running" : "Run query"}
                   </button>
-                ))}
-              </div>
-              {error ? (
-                <p className="error-line">
-                  <AlertTriangle size={16} />
-                  {error}
-                </p>
-              ) : null}
-            </form>
+                </div>
+                {error ? (
+                  <p className="error-line">
+                    <AlertTriangle size={16} />
+                    {error}
+                  </p>
+                ) : null}
+              </form>
+            </section>
 
-            <AnswerPanel answer={answer} isLoading={isLoading} />
+            <section className="analysis-grid">
+              <SqlPanel answer={answer} onCopy={copySql} copied={copied} />
+              <AnswerPanel answer={answer} isLoading={isLoading} />
+            </section>
             <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
           </div>
         </section>
@@ -167,6 +181,20 @@ function App() {
   );
 }
 
+function PipelineStatus({ answer, isLoading }) {
+  const steps = ["Generate", "Validate", "Execute", "Format"];
+  const activeIndex = isLoading ? 1 : answer ? 3 : -1;
+  return (
+    <div className="pipeline-status" aria-label="Agent pipeline status">
+      {steps.map((step, index) => (
+        <span key={step} className={index <= activeIndex ? "is-active" : ""}>
+          {step}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StatusPill({ health }) {
   const label = health === "online" ? "API online" : health === "offline" ? "API offline" : "Checking API";
   return (
@@ -174,6 +202,39 @@ function StatusPill({ health }) {
       <span className="status-led" />
       {label}
     </div>
+  );
+}
+
+function StatusBadge({ status, corrected }) {
+  const label = corrected ? "corrected" : status || "standby";
+  return <span className={`status-badge ${label}`}>{label}</span>;
+}
+
+function SqlPanel({ answer, onCopy, copied }) {
+  const corrected = answer?.corrected_sql?.length > 0;
+  const sql = answer?.sql || answer?.original_sql || "SELECT ...";
+
+  return (
+    <section className="sql-workspace">
+      <div className="panel-title">
+        <h2>
+          <Braces size={18} />
+          Generated SQL
+        </h2>
+        <div className="panel-actions">
+          <StatusBadge status={answer?.status} corrected={corrected} />
+          <button type="button" className="text-action" onClick={onCopy} disabled={!answer}>
+            <Clipboard size={15} />
+            {copied ? "Copied" : "Copy SQL"}
+          </button>
+        </div>
+      </div>
+      <pre className="sql-code">{sql}</pre>
+      <div className="sql-meta">
+        <span>Retries: {answer?.retry_count ?? 0}</span>
+        <span>Rows: {answer?.row_count ?? 0}</span>
+      </div>
+    </section>
   );
 }
 
@@ -188,14 +249,6 @@ function AnswerPanel({ answer, isLoading }) {
           Final answer
         </span>
         <p>{isLoading ? "The agent is generating SQL and checking the database." : answer?.final_answer || "Run a query to see the answer."}</p>
-      </article>
-
-      <article className="answer-card sql">
-        <span>
-          <Braces size={16} />
-          Generated SQL
-        </span>
-        <pre>{answer?.sql || answer?.original_sql || "SELECT ..."}</pre>
       </article>
 
       <article className="answer-card">
@@ -231,7 +284,13 @@ function ResultsTable({ rows, rowCount }) {
           <TableProperties size={18} />
           Results
         </h2>
-        <span>{rowCount} rows</span>
+        <div className="panel-actions">
+          <span>{rowCount} rows</span>
+          <button type="button" className="text-action" disabled={!rows.length}>
+            <FileDown size={15} />
+            Export
+          </button>
+        </div>
       </div>
       {!rows.length ? (
         <div className="empty-state">No rows to display yet.</div>
@@ -258,6 +317,8 @@ function ResultsTable({ rows, rowCount }) {
 }
 
 function SchemaPanel({ schema, onRefresh }) {
+  const tableCount = Object.keys(schema).length;
+
   return (
     <aside className="schema-rail">
       <div className="panel-title">
@@ -269,11 +330,24 @@ function SchemaPanel({ schema, onRefresh }) {
           <RefreshCw size={16} />
         </button>
       </div>
+      <div className="rail-summary">
+        <strong>{tableCount}</strong>
+        <span>tables indexed</span>
+      </div>
       <div className="schema-stack">
         {Object.entries(schema).map(([table, columns]) => (
           <details key={table} open={["students", "courses"].includes(table)}>
-            <summary>{table}</summary>
-            <p>{columns.map((column) => `${column.name} ${column.type}`).join(", ")}</p>
+            <summary>
+              <span>{table}</span>
+              <em>{columns.length}</em>
+            </summary>
+            <div className="column-list">
+              {columns.map((column) => (
+                <span key={column.name}>
+                  {column.name} <em>{column.type}</em>
+                </span>
+              ))}
+            </div>
           </details>
         ))}
       </div>
@@ -293,12 +367,16 @@ function HistoryPanel({ records, onRefresh, onSelect }) {
           <RefreshCw size={16} />
         </button>
       </div>
+      <div className="rail-summary">
+        <strong>{records.length}</strong>
+        <span>recent runs</span>
+      </div>
       <div className="history-stack">
         {records.length ? (
           records.map((record) => (
             <button key={record.id} type="button" onClick={() => onSelect(record)}>
               <strong>{record.question}</strong>
-              <span>{record.execution_status}</span>
+              <span>{record.execution_status} / click to rerun</span>
             </button>
           ))
         ) : (
