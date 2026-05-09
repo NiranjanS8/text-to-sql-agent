@@ -21,6 +21,7 @@ dev = [
 
 [project.scripts]
 text-to-sql-api = "text_to_sql_agent.main:run"
+text-to-sql-eval = "text_to_sql_agent.evaluation:run_cli"
 
 [build-system]
 requires = ["hatchling"]

@@ -66,6 +66,8 @@ button {
 .panel-title,
 .status-pill,
 .run-button,
+.final-answer-label,
+.final-answer-meta,
 .answer-card span,
 .error-line,
 .panel-actions,
@@ -300,6 +302,7 @@ h1 {
 }
 
 .query-console,
+.final-answer-band,
 .answer-card,
 .results-panel,
 .sql-workspace {
@@ -414,6 +417,53 @@ textarea::placeholder {
   font-weight: 700;
 }
 
+.final-answer-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border-color: rgba(162, 175, 155, 0.44);
+  background: #121412;
+  box-shadow: 0 0 0 1px rgba(162, 175, 155, 0.08);
+}
+
+.final-answer-label {
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.final-answer-message {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.final-answer-meta {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 184px;
+}
+
+.final-answer-meta > span:not(.status-badge) {
+  min-height: 26px;
+  padding: 6px 9px;
+  border: 1px solid rgba(220, 207, 192, 0.2);
+  background: var(--surface-lowest);
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
 .analysis-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
@@ -454,11 +504,6 @@ textarea::placeholder {
 .answer-card {
   min-height: 104px;
   padding: 16px;
-}
-
-.answer-card.final {
-  border-color: rgba(162, 175, 155, 0.44);
-  background: #121412;
 }
 
 .answer-card.corrected {
@@ -776,9 +821,15 @@ summary em,
 
   .canvas-header,
   .input-row,
+  .final-answer-band,
   .console-footer {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .final-answer-meta {
+    justify-content: flex-start;
+    min-width: 0;
   }
 
   .answer-panel {

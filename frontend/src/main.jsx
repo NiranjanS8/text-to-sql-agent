@@ -170,10 +170,11 @@ function App() {
               </form>
             </section>
 
+            <FinalAnswerBand answer={answer} isLoading={isLoading} />
             <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
             <section className="analysis-grid">
               <SqlPanel answer={answer} onCopy={copySql} copied={copied} />
-              <AnswerPanel answer={answer} isLoading={isLoading} />
+              <InsightPanel answer={answer} />
             </section>
           </div>
         </section>
@@ -233,19 +234,45 @@ function SqlPanel({ answer, onCopy, copied }) {
   );
 }
 
-function AnswerPanel({ answer, isLoading }) {
+function FinalAnswerBand({ answer, isLoading }) {
+  const corrected = answer?.corrected_sql?.length > 0;
+  const message = getFinalAnswerMessage(answer, isLoading);
+
+  return (
+    <section className="final-answer-band" aria-live="polite">
+      <div>
+        <span className="final-answer-label">
+          <Sparkles size={16} />
+          Final answer
+        </span>
+        <p className="final-answer-message">{message}</p>
+      </div>
+      <div className="final-answer-meta" aria-label="Answer status">
+        <StatusBadge status={answer?.status} corrected={corrected} />
+        <span>{answer?.row_count ?? 0} rows</span>
+        <span>{answer?.retry_count ?? 0} retries</span>
+      </div>
+    </section>
+  );
+}
+
+function getFinalAnswerMessage(answer, isLoading) {
+  if (isLoading) {
+    return "Generating SQL, validating it, and checking the database.";
+  }
+
+  if (!answer) {
+    return "Ask a question to generate SQL, inspect the rows, and get a concise answer.";
+  }
+
+  return answer.final_answer || "The query completed, but no final answer was returned.";
+}
+
+function InsightPanel({ answer }) {
   const corrected = answer?.corrected_sql?.length > 0;
 
   return (
     <section className="answer-panel" aria-live="polite">
-      <article className="answer-card final">
-        <span>
-          <Sparkles size={16} />
-          Final answer
-        </span>
-        <p>{isLoading ? "The agent is generating SQL and checking the database." : answer?.final_answer || "Run a query to see the answer."}</p>
-      </article>
-
       <article className="answer-card">
         <span>
           <Clipboard size={16} />
