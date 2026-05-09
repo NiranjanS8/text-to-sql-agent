@@ -1,12 +1,14 @@
 from pathlib import Path
 
 from text_to_sql_agent.agent_workflow import (
+    execute_approved_sql,
     create_sql_correction_tool,
     create_sql_explanation_tool,
     create_final_answer_tool,
     create_schema_context_tool,
     create_sql_execution_tool,
     create_sql_validation_tool,
+    prepare_sql_for_approval,
     run_agent_pipeline,
 )
 from text_to_sql_agent.config import Settings
@@ -170,6 +172,41 @@ def test_run_agent_pipeline_adds_limit_for_top_queries(tmp_path: Path, monkeypat
 
     assert result.execution.sql == "SELECT name FROM students ORDER BY name LIMIT 10;"
     assert result.execution.row_count == 10
+
+
+def test_prepare_sql_for_approval_does_not_execute_query(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    settings = Settings(DATABASE_URL=f"sqlite:///{database_path}")
+
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name FROM students ORDER BY id;",
+    )
+
+    result = prepare_sql_for_approval("Show all student names", settings=settings)
+
+    assert result.execution.status == "awaiting_approval"
+    assert result.execution.row_count == 0
+    assert result.execution.data == []
+    assert result.execution.sql == "SELECT name FROM students ORDER BY id;"
+    assert result.to_dict()["final_answer"] == "SQL is ready for human approval before execution."
+
+
+def test_execute_approved_sql_runs_validated_query(tmp_path: Path) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    settings = Settings(DATABASE_URL=f"sqlite:///{database_path}")
+
+    result = execute_approved_sql(
+        "Show all student names",
+        "SELECT name FROM students ORDER BY id;",
+        settings=settings,
+    )
+
+    assert result.execution.status == "success"
+    assert result.execution.row_count == 10
+    assert result.execution.data[0] == {"name": "Aarav Sharma"}
 
 
 def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path, monkeypatch) -> None:

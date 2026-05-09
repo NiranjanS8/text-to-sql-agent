@@ -33,6 +33,8 @@ def build_final_answer(result: QueryExecutionResult | dict[str, Any]) -> str:
         return f"I could not run the query because it failed safety validation: {error}"
     if status == "sql_error":
         return f"I could not answer the question because SQLite returned an error: {error}"
+    if status == "awaiting_approval":
+        return "SQL is ready for human approval before execution."
     if status == "edge_case":
         return str(_value(result, "message") or f"The query needed an edge-case explanation for: {question}")
     if row_count == 0:

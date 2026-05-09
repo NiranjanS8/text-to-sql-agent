@@ -66,6 +66,11 @@ button {
 .panel-title,
 .status-pill,
 .run-button,
+.approve-button,
+.approval-panel,
+.approval-panel span,
+.approval-toggle,
+.execution-controls,
 .final-answer-label,
 .final-answer-meta,
 .answer-card span,
@@ -359,7 +364,8 @@ textarea::placeholder {
   color: rgba(206, 197, 187, 0.5);
 }
 
-.run-button {
+.run-button,
+.approve-button {
   justify-content: center;
   gap: 8px;
   min-width: 124px;
@@ -376,7 +382,13 @@ textarea::placeholder {
   box-shadow: 0 0 4px rgba(220, 207, 192, 0.2);
 }
 
-.run-button:disabled {
+.approve-button {
+  border-color: var(--secondary);
+  background: var(--secondary);
+}
+
+.run-button:disabled,
+.approve-button:disabled {
   cursor: wait;
   opacity: 0.7;
 }
@@ -407,6 +419,23 @@ textarea::placeholder {
 .sample-strip button:hover {
   border-color: var(--secondary);
   color: var(--text);
+}
+
+.execution-controls {
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.approval-toggle {
+  gap: 8px;
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.approval-toggle input {
+  accent-color: var(--secondary);
 }
 
 .error-line {
@@ -462,6 +491,29 @@ textarea::placeholder {
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   text-transform: uppercase;
+}
+
+.approval-panel {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(162, 175, 155, 0.34);
+  background: rgba(162, 175, 155, 0.08);
+}
+
+.approval-panel span {
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.approval-panel p {
+  margin: 0;
+  color: var(--muted);
 }
 
 .analysis-grid {
@@ -571,7 +623,8 @@ textarea::placeholder {
 
 .status-badge.sql_error,
 .status-badge.validation_error,
-.status-badge.edge_case {
+.status-badge.edge_case,
+.status-badge.awaiting_approval {
   border-color: var(--warning);
   color: var(--warning);
 }
@@ -822,6 +875,8 @@ summary em,
   .canvas-header,
   .input-row,
   .final-answer-band,
+  .approval-panel,
+  .execution-controls,
   .console-footer {
     display: grid;
     grid-template-columns: 1fr;
@@ -836,7 +891,8 @@ summary em,
     grid-template-columns: 1fr;
   }
 
-  .run-button {
+  .run-button,
+  .approve-button {
     width: 100%;
   }
 }

@@ -44,3 +44,35 @@ SQL generation and correction use a lightweight retrieval layer over schema note
 
 This keeps prompts grounded in domain knowledge while preserving a simple local setup.
 
+## Human Approval Mode
+
+The API and React UI support a human-in-the-loop execution path for safer agentic workflows.
+
+- Normal mode: `/ask` generates, validates, executes, and formats the answer.
+- Approval mode: `/ask` with `require_approval: true` generates and validates SQL, then returns `awaiting_approval` without executing.
+- Approval execution: `/approve` validates the reviewed SQL again, executes it, saves history, and returns the final answer.
+
+This demonstrates bounded tool use and human review before database actions.
+
+## Docker Deployment
+
+Create a local env file:
+
+```bash
+cp .env.example .env
+```
+
+Build and run with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+The app will be available at:
+
+```text
+http://localhost:8000
+```
+
+The container builds the React frontend, installs the FastAPI package, initializes SQLite on startup, and persists database state in the `text_to_sql_data` Docker volume.
+

@@ -36,3 +36,12 @@ def test_build_final_answer_for_success_empty_and_error_states() -> None:
         "I could not answer the question because SQLite returned an error: no such column: missing"
     )
 
+
+def test_build_final_answer_for_approval_preview() -> None:
+    result = QueryExecutionResult(
+        question="Show students",
+        sql="SELECT name FROM students;",
+        status="awaiting_approval",
+    )
+
+    assert build_final_answer(result) == "SQL is ready for human approval before execution."

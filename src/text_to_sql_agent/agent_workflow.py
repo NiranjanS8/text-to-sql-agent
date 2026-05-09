@@ -113,6 +113,85 @@ def create_final_answer_tool() -> StructuredTool:
     )
 
 
+def prepare_sql_for_approval(question: str, settings: Settings | None = None) -> AgentWorkflowResult:
+    active_settings = settings or get_settings()
+    database_path = active_settings.database_path
+
+    generation_tool = create_sql_generation_tool(active_settings)
+    validation_tool = create_sql_validation_tool()
+    explanation_tool = create_sql_explanation_tool()
+    final_answer_tool = create_final_answer_tool()
+
+    schema_context = build_retrieved_schema_context(question, database_path)
+    generated_sql = generation_tool.invoke({"question": question})
+    hinted_sql = apply_question_sql_hints(question, generated_sql)
+    validation = validation_tool.invoke({"sql": hinted_sql})
+    preview_sql = validation.sql if validation.is_safe else hinted_sql
+    execution = QueryExecutionResult(
+        question=question,
+        sql=preview_sql,
+        status="awaiting_approval" if validation.is_safe else "validation_error",
+        error=None if validation.is_safe else validation.error,
+        message="Review and approve this read-only SQL before execution." if validation.is_safe else None,
+    )
+    explanation = explanation_tool.invoke({"sql": preview_sql})
+    final_answer = final_answer_tool.invoke({"result": execution})
+
+    return AgentWorkflowResult(
+        question=question,
+        schema_context=schema_context,
+        generated_sql=generated_sql,
+        validated_sql=validation.sql,
+        validation=validation,
+        execution=execution,
+        corrected_sql=[],
+        retry_count=0,
+        explanation=explanation,
+        final_answer=final_answer,
+    )
+
+
+def execute_approved_sql(question: str, sql: str, settings: Settings | None = None) -> AgentWorkflowResult:
+    active_settings = settings or get_settings()
+    database_path = active_settings.database_path
+
+    validation_tool = create_sql_validation_tool()
+    execution_tool = create_sql_execution_tool(database_path)
+    explanation_tool = create_sql_explanation_tool()
+    final_answer_tool = create_final_answer_tool()
+
+    schema_context = build_retrieved_schema_context(question, database_path)
+    validation = validation_tool.invoke({"sql": sql})
+    sql_to_execute = validation.sql if validation.is_safe else sql
+    execution = execution_tool.invoke({"question": question, "sql": sql_to_execute})
+
+    if execution.status == "validation_error":
+        edge_case_result = resolve_validation_edge_case(question, validation, database_path)
+        if edge_case_result:
+            execution = edge_case_result
+
+    if execution.status == "success" and execution.row_count == 0:
+        edge_case_result = resolve_empty_result_edge_case(question, database_path)
+        if edge_case_result:
+            execution = edge_case_result
+
+    explanation = explanation_tool.invoke({"sql": execution.sql})
+    final_answer = final_answer_tool.invoke({"result": execution})
+
+    return AgentWorkflowResult(
+        question=question,
+        schema_context=schema_context,
+        generated_sql=sql,
+        validated_sql=validation.sql,
+        validation=validation,
+        execution=execution,
+        corrected_sql=[],
+        retry_count=0,
+        explanation=explanation,
+        final_answer=final_answer,
+    )
+
+
 def run_agent_pipeline(
     question: str,
     settings: Settings | None = None,

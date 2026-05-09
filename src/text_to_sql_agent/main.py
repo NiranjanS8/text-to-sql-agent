@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from text_to_sql_agent.agent_workflow import run_agent_pipeline
+from text_to_sql_agent.agent_workflow import execute_approved_sql, prepare_sql_for_approval, run_agent_pipeline
 from text_to_sql_agent.config import get_settings
 from text_to_sql_agent.database import get_schema, initialize_database
 from text_to_sql_agent.history import list_query_history, save_query_history
@@ -16,6 +16,12 @@ from text_to_sql_agent.llm import LLMConfigurationError, test_mistral_connection
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, examples=["Show all students enrolled in Java course"])
+    require_approval: bool = Field(default=False, description="Return generated SQL for review before execution.")
+
+
+class ApproveRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    sql: str = Field(..., min_length=1)
 
 
 def create_app() -> FastAPI:
@@ -52,10 +58,20 @@ def create_app() -> FastAPI:
     @app.post("/ask", tags=["agent"])
     def ask(request: AskRequest) -> dict[str, object]:
         try:
-            workflow = run_agent_pipeline(request.question, settings=settings)
+            if request.require_approval:
+                workflow = prepare_sql_for_approval(request.question, settings=settings)
+            else:
+                workflow = run_agent_pipeline(request.question, settings=settings)
         except LLMConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+        if workflow.execution.status != "awaiting_approval":
+            save_query_history(workflow, database_path=settings.database_path)
+        return workflow.to_dict()
+
+    @app.post("/approve", tags=["agent"])
+    def approve(request: ApproveRequest) -> dict[str, object]:
+        workflow = execute_approved_sql(request.question, request.sql, settings=settings)
         save_query_history(workflow, database_path=settings.database_path)
         return workflow.to_dict()
 

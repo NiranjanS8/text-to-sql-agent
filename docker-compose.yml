@@ -1,0 +1,16 @@
+services:
+  text-to-sql-agent:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////app/data/text_to_sql.db
+      LOG_LEVEL: INFO
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-large-latest}
+    volumes:
+      - text_to_sql_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  text_to_sql_data:

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   Activity,
   AlertTriangle,
+  CheckCircle2,
   Braces,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +39,7 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [isSchemaOpen, setIsSchemaOpen] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [requireApproval, setRequireApproval] = useState(false);
 
   useEffect(() => {
     loadHealth();
@@ -78,12 +80,39 @@ function App() {
       const response = await fetch("/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: question.trim() }),
+        body: JSON.stringify({ question: question.trim(), require_approval: requireApproval }),
       });
       const payload = await response.json();
 
       if (!response.ok) {
         throw new Error(payload.detail || "The agent could not answer that question.");
+      }
+
+      setAnswer(payload);
+      await loadHistory();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function approveSql() {
+    if (!answer?.sql || !answer?.question) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: answer.question, sql: answer.sql }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.detail || "The approved SQL could not be executed.");
       }
 
       setAnswer(payload);
@@ -156,10 +185,20 @@ function App() {
                       </button>
                     ))}
                   </div>
-                  <button className="run-button" type="submit" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
-                    {isLoading ? "Running" : "Run query"}
-                  </button>
+                  <div className="execution-controls">
+                    <label className="approval-toggle">
+                      <input
+                        type="checkbox"
+                        checked={requireApproval}
+                        onChange={(event) => setRequireApproval(event.target.checked)}
+                      />
+                      Review SQL before execute
+                    </label>
+                    <button className="run-button" type="submit" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
+                      {isLoading ? "Running" : requireApproval ? "Generate SQL" : "Run query"}
+                    </button>
+                  </div>
                 </div>
                 {error ? (
                   <p className="error-line">
@@ -171,6 +210,7 @@ function App() {
             </section>
 
             <FinalAnswerBand answer={answer} isLoading={isLoading} />
+            <ApprovalPanel answer={answer} isLoading={isLoading} onApprove={approveSql} />
             <ResultsTable rows={answer?.data || []} rowCount={answer?.row_count || 0} />
             <section className="analysis-grid">
               <SqlPanel answer={answer} onCopy={copySql} copied={copied} />
@@ -266,6 +306,26 @@ function getFinalAnswerMessage(answer, isLoading) {
   }
 
   return answer.final_answer || "The query completed, but no final answer was returned.";
+}
+
+function ApprovalPanel({ answer, isLoading, onApprove }) {
+  if (answer?.status !== "awaiting_approval") return null;
+
+  return (
+    <section className="approval-panel">
+      <div>
+        <span>
+          <CheckCircle2 size={16} />
+          Human approval required
+        </span>
+        <p>Review the generated read-only SQL below, then approve it to execute against SQLite.</p>
+      </div>
+      <button className="approve-button" type="button" onClick={onApprove} disabled={isLoading}>
+        {isLoading ? <Loader2 className="spin" size={18} /> : <CheckCircle2 size={18} />}
+        Approve and execute
+      </button>
+    </section>
+  );
 }
 
 function InsightPanel({ answer }) {

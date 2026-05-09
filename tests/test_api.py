@@ -70,6 +70,39 @@ def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
     assert payload["final_answer"] == "Found 10 matching rows for: Show all students"
 
 
+def test_ask_endpoint_can_prepare_sql_for_approval(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name FROM students ORDER BY id;",
+    )
+
+    response = client.post(
+        "/ask",
+        json={"question": "Show all student names", "require_approval": True},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "awaiting_approval"
+    assert payload["row_count"] == 0
+    assert payload["data"] == []
+    assert payload["sql"] == "SELECT name FROM students ORDER BY id;"
+    assert payload["final_answer"] == "SQL is ready for human approval before execution."
+
+
+def test_approve_endpoint_executes_reviewed_sql() -> None:
+    response = client.post(
+        "/approve",
+        json={"question": "Show all student names", "sql": "SELECT name FROM students ORDER BY id;"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["row_count"] == 10
+    assert payload["data"][0] == {"name": "Aarav Sharma"}
+
+
 def test_ask_endpoint_returns_validation_error_for_unsafe_generated_sql(monkeypatch) -> None:
     monkeypatch.setattr("text_to_sql_agent.agent_workflow.generate_sql", lambda question, settings=None: "DROP TABLE students;")
 
