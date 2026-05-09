@@ -26,7 +26,7 @@ def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
         assert question == "Show all students"
         return "SELECT name, city FROM students ORDER BY id;"
 
-    monkeypatch.setattr("text_to_sql_agent.main.generate_sql", fake_generate_sql)
+    monkeypatch.setattr("text_to_sql_agent.agent_workflow.generate_sql", fake_generate_sql)
 
     response = client.post("/ask", json={"question": "Show all students"})
 
@@ -40,7 +40,7 @@ def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
 
 
 def test_ask_endpoint_returns_validation_error_for_unsafe_generated_sql(monkeypatch) -> None:
-    monkeypatch.setattr("text_to_sql_agent.main.generate_sql", lambda question, settings=None: "DROP TABLE students;")
+    monkeypatch.setattr("text_to_sql_agent.agent_workflow.generate_sql", lambda question, settings=None: "DROP TABLE students;")
 
     response = client.post("/ask", json={"question": "Remove students"})
 
@@ -48,4 +48,3 @@ def test_ask_endpoint_returns_validation_error_for_unsafe_generated_sql(monkeypa
     payload = response.json()
     assert payload["status"] == "validation_error"
     assert payload["error"] == "Only SELECT queries are allowed."
-
