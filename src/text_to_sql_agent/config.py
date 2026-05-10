@@ -32,12 +32,14 @@ class Settings(BaseSettings):
         return (ROOT_DIR / path).resolve()
 
     @property
-    def database_dialect(self) -> Literal["sqlite", "postgresql"]:
+    def database_dialect(self) -> Literal["sqlite", "postgresql", "mongodb"]:
         if self.database_url.startswith("sqlite:///"):
             return "sqlite"
         if self.database_url.startswith(("postgresql://", "postgres://")):
             return "postgresql"
-        raise ValueError("DATABASE_URL must start with sqlite:///, postgresql://, or postgres://.")
+        if self.database_url.startswith(("mongodb://", "mongodb+srv://")):
+            return "mongodb"
+        raise ValueError("DATABASE_URL must start with sqlite:///, postgresql://, postgres://, mongodb://, or mongodb+srv://.")
 
     @property
     def database_source(self) -> Path | str:

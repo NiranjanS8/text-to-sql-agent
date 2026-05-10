@@ -17,6 +17,14 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
   text-to-sql-agent:
     build: .
     ports:
@@ -36,9 +44,11 @@ services:
     depends_on:
       - redis
       - postgres
+      - mongodb
     restart: unless-stopped
 
 volumes:
   text_to_sql_data:
   redis_data:
   postgres_data:
+  mongodb_data:

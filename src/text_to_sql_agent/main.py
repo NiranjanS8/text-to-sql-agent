@@ -14,6 +14,7 @@ from text_to_sql_agent.config import get_settings
 from text_to_sql_agent.database import get_schema, initialize_database
 from text_to_sql_agent.history import list_query_history, save_query_history
 from text_to_sql_agent.llm import LLMConfigurationError, test_mistral_connection
+from text_to_sql_agent.mongo_query import execute_approved_mongo_query, prepare_mongo_for_approval, run_mongo_pipeline
 
 
 RATE_LIMIT_MESSAGE = (
@@ -66,9 +67,17 @@ def create_app() -> FastAPI:
     def ask(request: AskRequest) -> dict[str, object]:
         try:
             if request.require_approval:
-                workflow = prepare_sql_for_approval(request.question, settings=settings)
+                workflow = (
+                    prepare_mongo_for_approval(request.question, settings=settings)
+                    if settings.database_dialect == "mongodb"
+                    else prepare_sql_for_approval(request.question, settings=settings)
+                )
             else:
-                workflow = run_agent_pipeline(request.question, settings=settings)
+                workflow = (
+                    run_mongo_pipeline(request.question, settings=settings)
+                    if settings.database_dialect == "mongodb"
+                    else run_agent_pipeline(request.question, settings=settings)
+                )
         except LLMConfigurationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
@@ -96,7 +105,11 @@ def create_app() -> FastAPI:
         except ApprovalError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        workflow = execute_approved_sql(approval.question, approval.sql, settings=settings)
+        workflow = (
+            execute_approved_mongo_query(approval.question, approval.sql, settings=settings)
+            if settings.database_dialect == "mongodb"
+            else execute_approved_sql(approval.question, approval.sql, settings=settings)
+        )
         save_query_history(workflow, database_path=settings.database_source)
         response = workflow.to_dict()
         response["approval_id"] = approval.id

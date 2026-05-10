@@ -324,7 +324,9 @@ SAMPLE_ROWS: dict[str, list[tuple[Any, ...]]] = {
 def get_connection(database_path: DatabaseSource | None = None) -> Iterator[Any]:
     source = database_path or get_settings().database_source
     dialect = get_database_dialect(source)
-    if dialect == "postgresql":
+    if dialect == "mongodb":
+        connection = _connect_mongo(str(source))
+    elif dialect == "postgresql":
         connection = _connect_postgres(str(source))
     else:
         path = _sqlite_path(source)
@@ -340,7 +342,10 @@ def get_connection(database_path: DatabaseSource | None = None) -> Iterator[Any]
 
 def initialize_database(database_path: DatabaseSource | None = None) -> None:
     source = database_path or get_settings().database_source
-    if get_database_dialect(source) == "postgresql":
+    dialect = get_database_dialect(source)
+    if dialect == "mongodb":
+        _initialize_mongo_database(source)
+    elif dialect == "postgresql":
         _initialize_postgres_database(source)
     else:
         _initialize_sqlite_database(source)
@@ -489,6 +494,17 @@ def _initialize_postgres_database(database_url: DatabaseSource) -> None:
         connection.commit()
 
 
+def _initialize_mongo_database(database_url: DatabaseSource) -> None:
+    with get_connection(database_url) as database:
+        for collection_name, rows in SAMPLE_ROWS.items():
+            collection = database[collection_name]
+            if collection.estimated_document_count() > 0:
+                continue
+            collection.insert_many(_mongo_documents(collection_name, rows))
+        database["query_history"].create_index("created_at")
+        database["sql_approvals"].create_index("expires_at")
+
+
 def _seed_table(connection: Any, table: str, sql: str) -> None:
     connection.executemany(sql, SAMPLE_ROWS[table])
 
@@ -500,7 +516,10 @@ def _seed_postgres_table(connection: Any, table: str, sql: str) -> None:
 
 def get_table_names(database_path: DatabaseSource | None = None) -> list[str]:
     with get_connection(database_path) as connection:
-        if get_database_dialect(database_path or get_settings().database_source) == "postgresql":
+        dialect = get_database_dialect(database_path or get_settings().database_source)
+        if dialect == "mongodb":
+            return sorted(name for name in connection.list_collection_names() if not name.startswith("system."))
+        if dialect == "postgresql":
             rows = connection.execute(
                 """
                 SELECT table_name AS name
@@ -529,7 +548,20 @@ def get_schema(database_path: DatabaseSource | None = None, include_internal: bo
         for table in get_table_names(database_path):
             if not include_internal and table in INTERNAL_TABLES:
                 continue
-            if get_database_dialect(database_path or get_settings().database_source) == "postgresql":
+            dialect = get_database_dialect(database_path or get_settings().database_source)
+            if dialect == "mongodb":
+                document = connection[table].find_one({}, {"_id": 0}) or {}
+                schema[table] = [
+                    {
+                        "name": key,
+                        "type": type(value).__name__,
+                        "nullable": value is None,
+                        "primary_key": key == "id",
+                    }
+                    for key, value in sorted(document.items())
+                ]
+                continue
+            if dialect == "postgresql":
                 rows = connection.execute(
                     """
                     SELECT
@@ -595,7 +627,9 @@ def get_database_dialect(database_path: DatabaseSource | None = None) -> str:
         return "sqlite"
     if str(source).startswith(("postgresql://", "postgres://")):
         return "postgresql"
-    raise ValueError("Database source must be a SQLite path/URL or PostgreSQL URL.")
+    if str(source).startswith(("mongodb://", "mongodb+srv://")):
+        return "mongodb"
+    raise ValueError("Database source must be a SQLite path/URL, PostgreSQL URL, or MongoDB URL.")
 
 
 def _sqlite_path(source: DatabaseSource) -> Path:
@@ -613,3 +647,60 @@ def _connect_postgres(database_url: str) -> Any:
     except ImportError as exc:
         raise RuntimeError("PostgreSQL support requires installing psycopg[binary].") from exc
     return psycopg.connect(database_url, row_factory=dict_row)
+
+
+def _connect_mongo(database_url: str) -> Any:
+    try:
+        from pymongo import MongoClient
+    except ImportError as exc:
+        raise RuntimeError("MongoDB support requires installing pymongo.") from exc
+
+    client = MongoClient(database_url, serverSelectionTimeoutMS=1000)
+    database = client.get_default_database()
+    if database is None:
+        raise ValueError("MongoDB DATABASE_URL must include a database name.")
+    return _MongoDatabaseContext(client, database)
+
+
+class _MongoDatabaseContext:
+    def __init__(self, client: Any, database: Any) -> None:
+        self.client = client
+        self.database = database
+
+    def __getitem__(self, name: str) -> Any:
+        return self.database[name]
+
+    def list_collection_names(self) -> list[str]:
+        return self.database.list_collection_names()
+
+    def close(self) -> None:
+        self.client.close()
+
+
+def _mongo_documents(collection_name: str, rows: list[tuple[Any, ...]]) -> list[dict[str, Any]]:
+    columns = _sample_columns(collection_name)
+    documents: list[dict[str, Any]] = []
+    for row in rows:
+        document = dict(zip(columns, row, strict=True))
+        document["_id"] = f"{collection_name}:{document['id']}"
+        documents.append(document)
+    return documents
+
+
+def _sample_columns(collection_name: str) -> list[str]:
+    columns: dict[str, list[str]] = {
+        "students": ["id", "name", "email", "city", "joined_on"],
+        "courses": ["id", "title", "category", "fee"],
+        "enrollments": ["id", "student_id", "course_id", "enrolled_on", "status"],
+        "payments": ["id", "enrollment_id", "amount", "paid_on", "method", "status"],
+        "organizations": ["id", "name", "industry", "region", "employee_count", "created_on", "lifecycle_stage"],
+        "app_users": ["id", "organization_id", "name", "role", "email", "status", "created_on", "last_active_on"],
+        "plans": ["id", "name", "tier", "monthly_price", "included_seats", "included_events"],
+        "subscriptions": ["id", "organization_id", "plan_id", "started_on", "renewal_on", "status", "billing_interval", "seat_count"],
+        "invoices": ["id", "subscription_id", "invoice_month", "amount_due", "amount_paid", "status", "due_on", "paid_on"],
+        "usage_events": ["id", "organization_id", "user_id", "event_type", "event_count", "occurred_on"],
+        "support_tickets": ["id", "organization_id", "opened_by_user_id", "subject", "priority", "status", "category", "opened_on", "resolved_on"],
+        "feature_flags": ["id", "key", "name", "category", "release_stage"],
+        "feature_adoption": ["id", "organization_id", "feature_flag_id", "enabled_on", "active_users", "usage_count"],
+    }
+    return columns[collection_name]

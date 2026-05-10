@@ -250,7 +250,7 @@ def test_run_agent_pipeline_returns_final_error_when_retries_fail(tmp_path: Path
     assert result.execution.status == "sql_error"
     assert "missing_three" in str(result.execution.error)
     assert result.to_dict()["error"] == result.execution.error
-    assert "SQLite returned an error" in result.to_dict()["final_answer"]
+    assert "SQL database returned an error" in result.to_dict()["final_answer"]
 
 
 def test_sql_correction_tool_wraps_repair_function(monkeypatch) -> None:

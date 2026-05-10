@@ -1,6 +1,6 @@
 ﻿# Text-to-SQL Agent
 
-FastAPI backend for asking natural-language questions over SQLite or PostgreSQL using LangChain and Mistral.
+FastAPI backend for asking natural-language questions over SQLite, PostgreSQL, or MongoDB using LangChain and Mistral.
 
 ## Sample Domain
 
@@ -180,5 +180,25 @@ Docker Compose includes a local Postgres service. To run against it, set `DATABA
 
 ```bash
 DATABASE_URL=postgresql://text_to_sql:text_to_sql@postgres:5432/text_to_sql
+```
+
+MongoDB is supported as a separate document-query workflow:
+
+```bash
+DATABASE_URL=mongodb://localhost:27017/text_to_sql
+```
+
+For MongoDB, the model generates a safe JSON aggregation envelope:
+
+```json
+{"collection":"students","pipeline":[{"$match":{"city":"Delhi"}},{"$limit":10}]}
+```
+
+The MongoDB validator allows only approved domain collections and read-only aggregation stages, blocking `$out`, `$merge`, `$where`, `$function`, and other server-side code or write operators. The approval workflow and history APIs keep the same response shape as SQL backends.
+
+Docker Compose includes a local MongoDB service. To run against it from the API container, set:
+
+```bash
+DATABASE_URL=mongodb://mongodb:27017/text_to_sql
 ```
 

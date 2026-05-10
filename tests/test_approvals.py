@@ -8,6 +8,7 @@ from text_to_sql_agent.approvals import (
     consume_sql_approval,
     create_sql_approval,
     hash_sql,
+    normalize_query_artifact,
 )
 from text_to_sql_agent.database import get_connection, initialize_database
 
@@ -67,3 +68,12 @@ def test_consume_sql_approval_rejects_tampered_sql(tmp_path: Path) -> None:
 
     with pytest.raises(ApprovalError, match="integrity"):
         consume_sql_approval(created.id, database_path=database_path)
+
+
+def test_normalize_query_artifact_preserves_json_string_spaces() -> None:
+    query = '{"collection":"students","pipeline":[{"$match":{"city":"New Delhi"}}]}'
+
+    normalized = normalize_query_artifact(query)
+
+    assert '"New Delhi"' in normalized
+    assert hash_sql(query) == hash_sql(normalized)

@@ -38,7 +38,7 @@ def test_build_final_answer_for_success_empty_and_error_states() -> None:
     assert build_final_answer(success) == "Found 2 matching rows. First result: Aarav Sharma."
     assert build_final_answer(empty) == "No matching rows were found for: Show Jaipur students"
     assert build_final_answer(error) == (
-        "I could not answer the question because SQLite returned an error: no such column: missing"
+        "I could not answer the question because the SQL database returned an error: no such column: missing"
     )
 
 

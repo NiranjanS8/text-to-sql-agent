@@ -23,12 +23,25 @@ def test_settings_detects_postgres_database_source() -> None:
         _ = settings.database_path
 
 
+def test_settings_detects_mongodb_database_source() -> None:
+    settings = Settings(DATABASE_URL="mongodb://localhost:27017/text_to_sql")
+
+    assert settings.database_dialect == "mongodb"
+    assert settings.database_source == "mongodb://localhost:27017/text_to_sql"
+    with pytest.raises(ValueError, match="Only sqlite"):
+        _ = settings.database_path
+
+
 def test_database_dialect_accepts_postgres_url_alias() -> None:
     assert get_database_dialect("postgres://user:pass@localhost:5432/app") == "postgresql"
 
 
+def test_database_dialect_accepts_mongodb_url() -> None:
+    assert get_database_dialect("mongodb://localhost:27017/app") == "mongodb"
+
+
 def test_database_dialect_rejects_unsupported_url() -> None:
-    with pytest.raises(ValueError, match="SQLite path/URL or PostgreSQL URL"):
+    with pytest.raises(ValueError, match="SQLite path/URL, PostgreSQL URL, or MongoDB URL"):
         get_database_dialect("mysql://user:pass@localhost/app")
 
 
