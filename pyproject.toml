@@ -1,7 +1,7 @@
 [project]
 name = "text-to-sql-agent"
 version = "0.1.0"
-description = "Interview-ready Text-to-SQL agent using FastAPI, LangChain, Mistral, and SQLite."
+description = "Interview-ready natural-language data agent using FastAPI, LangChain, Mistral, SQLite, PostgreSQL, and MongoDB."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

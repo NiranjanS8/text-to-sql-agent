@@ -60,7 +60,10 @@ def test_run_agent_pipeline_uses_structured_steps(tmp_path: Path, monkeypatch) -
     assert result.execution.row_count == 2
     assert result.to_dict()["data"] == [{"name": "Meera Iyer"}, {"name": "Kabir Khan"}]
     assert result.to_dict()["original_sql"] == result.generated_sql
+    assert result.to_dict()["query"] == result.execution.sql
+    assert result.to_dict()["original_query"] == result.generated_sql
     assert result.to_dict()["corrected_sql"] == []
+    assert result.to_dict()["corrected_queries"] == []
     assert result.to_dict()["explanation"] == result.explanation
     assert result.to_dict()["final_answer"] == "Found 2 matching rows. First result: Meera Iyer."
 

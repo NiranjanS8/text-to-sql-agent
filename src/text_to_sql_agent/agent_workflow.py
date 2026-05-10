@@ -34,7 +34,10 @@ class AgentWorkflowResult:
     def to_dict(self) -> dict[str, Any]:
         response = self.execution.to_dict()
         response["original_sql"] = self.generated_sql
+        response["query"] = response["sql"]
+        response["original_query"] = self.generated_sql
         response["corrected_sql"] = self.corrected_sql
+        response["corrected_queries"] = self.corrected_sql
         response["retry_count"] = self.retry_count
         response["explanation"] = self.explanation
         response["final_answer"] = self.final_answer
@@ -48,7 +51,7 @@ def create_schema_context_tool(database_path: object | None = None) -> Structure
     return StructuredTool.from_function(
         func=get_schema_context,
         name="schema_context",
-        description="Fetches the SQLite schema context used for Text-to-SQL generation.",
+        description="Fetches database schema context used for query generation.",
     )
 
 
@@ -61,7 +64,7 @@ def create_sql_generation_tool(settings: Settings | None = None) -> StructuredTo
     return StructuredTool.from_function(
         func=generate,
         name="sql_generation",
-        description="Generates a SQLite SELECT query from a natural-language question.",
+        description="Generates a safe SQL SELECT query from a natural-language question.",
     )
 
 
@@ -80,7 +83,7 @@ def create_sql_execution_tool(database_path: object | None = None) -> Structured
     return StructuredTool.from_function(
         func=execute,
         name="sql_execution",
-        description="Executes validated SQL against SQLite and returns JSON-ready rows.",
+        description="Executes validated SQL against the configured SQL database and returns JSON-ready rows.",
     )
 
 
@@ -93,7 +96,7 @@ def create_sql_correction_tool(settings: Settings | None = None) -> StructuredTo
     return StructuredTool.from_function(
         func=repair,
         name="sql_correction",
-        description="Repairs a failed SQLite SELECT query using the database schema and SQLite error.",
+        description="Repairs a failed SQL SELECT query using the database schema and database error.",
     )
 
 
@@ -132,7 +135,7 @@ def prepare_sql_for_approval(question: str, settings: Settings | None = None) ->
         sql=preview_sql,
         status="awaiting_approval" if validation.is_safe else "validation_error",
         error=None if validation.is_safe else validation.error,
-        message="Review and approve this read-only SQL before execution." if validation.is_safe else None,
+        message="Review and approve this read-only query before execution." if validation.is_safe else None,
     )
     explanation = explanation_tool.invoke({"sql": preview_sql})
     final_answer = final_answer_tool.invoke({"result": execution})
@@ -237,7 +240,7 @@ def run_agent_pipeline(
             {
                 "question": question,
                 "failed_sql": execution.sql,
-                "error": execution.error or "Unknown SQLite error.",
+                "error": execution.error or "Unknown database error.",
             }
         )
         corrected_sql.append(repaired_sql)

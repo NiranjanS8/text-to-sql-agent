@@ -75,6 +75,8 @@ def test_ask_endpoint_generates_validates_and_executes_sql(monkeypatch) -> None:
     payload = response.json()
     assert payload["question"] == "Show all students"
     assert payload["sql"] == "SELECT name, city FROM students ORDER BY id;"
+    assert payload["query"] == "SELECT name, city FROM students ORDER BY id;"
+    assert payload["original_query"] == "SELECT name, city FROM students ORDER BY id;"
     assert payload["status"] == "success"
     assert payload["row_count"] == 10
     assert payload["data"][0] == {"name": "Aarav Sharma", "city": "Delhi"}

@@ -25,7 +25,7 @@ RATE_LIMIT_MESSAGE = (
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, examples=["Show all students enrolled in Java course"])
-    require_approval: bool = Field(default=False, description="Return generated SQL for review before execution.")
+    require_approval: bool = Field(default=False, description="Return generated query for review before execution.")
 
 
 class ApproveRequest(BaseModel):
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Text-to-SQL Agent",
         version="0.1.0",
-        description="FastAPI backend for natural-language SQL over SQLite.",
+        description="FastAPI backend for natural-language queries over SQLite, PostgreSQL, and MongoDB.",
     )
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 

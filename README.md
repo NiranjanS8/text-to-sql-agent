@@ -61,13 +61,13 @@ This keeps prompts grounded in domain knowledge while preserving a simple local 
 The backend supports optional Redis-backed caching for expensive read paths:
 
 - retrieved schema/RAG context
-- generated SQL for repeated questions
-- corrected SQL for repeated repair attempts
-- semantic SQL reuse for paraphrased questions
+- generated queries for repeated questions
+- corrected queries for repeated repair attempts
+- semantic query reuse for paraphrased questions
 
-Cache keys include the question, model, prompt/cache version, schema context, and database fingerprint where relevant, so prompt or data changes do not silently reuse old SQL. If `REDIS_URL` is missing or Redis is unavailable, the app falls back to uncached execution.
+Cache keys include the question, model, prompt/cache version, schema context, and database fingerprint where relevant, so prompt or data changes do not silently reuse old queries. If `REDIS_URL` is missing or Redis is unavailable, the app falls back to uncached execution.
 
-Semantic caching is conservative: it reuses generated SQL only when a normalized question vector is above `SEMANTIC_CACHE_THRESHOLD` in the same model, prompt, and database namespace. Reused SQL still goes through validation, semantic guardrails, approval mode, and execution policy.
+Semantic caching is conservative: it reuses generated query text only when a normalized question vector is above `SEMANTIC_CACHE_THRESHOLD` in the same model, prompt, and database namespace. Reused queries still go through validation, semantic guardrails, approval mode, and execution policy.
 
 Local Docker Compose starts Redis automatically:
 
@@ -96,10 +96,10 @@ GET /cache/health
 The API and React UI support a human-in-the-loop execution path for safer agentic workflows.
 
 - Normal mode: `/ask` generates, validates, executes, and formats the answer.
-- Approval mode: `/ask` with `require_approval: true` generates and validates SQL, stores a short-lived approval record, then returns `awaiting_approval` plus an `approval_id` without executing.
-- Approval execution: `/approve` consumes the pending `approval_id`, validates the stored SQL again, executes it once, saves history, and returns the final answer.
+- Approval mode: `/ask` with `require_approval: true` generates and validates a query, stores a short-lived approval record, then returns `awaiting_approval` plus an `approval_id` without executing.
+- Approval execution: `/approve` consumes the pending `approval_id`, validates the stored query again, executes it once, saves history, and returns the final answer.
 
-Approval records include an integrity hash and expiry timestamp. `/approve` does not accept arbitrary SQL, so approval mode acts like a bounded workflow instead of a second SQL execution endpoint.
+Approval records include an integrity hash and expiry timestamp. `/approve` does not accept arbitrary query text, so approval mode acts like a bounded workflow instead of a second execution endpoint.
 
 This demonstrates bounded tool use and human review before database actions.
 
@@ -127,14 +127,14 @@ The agent applies semantic checks after SQL validation and before database execu
 
 This gives the project a stronger applied-AI safety story: query execution is bounded not only by syntax, but also by domain intent.
 
-## SQL Policy
+## Query Policy
 
-SQL validation enforces a conservative read-only policy before execution:
+Query validation enforces a conservative read-only policy before execution:
 
 - exactly one `SELECT` statement
 - no write/DDL keywords
 - no SQL comments
-- no unsafe SQLite file/extension functions
+- no unsafe database file/extension functions
 - only public domain tables are queryable
 - internal tables such as query history and SQL approvals are hidden from schema prompts and `/schema`
 

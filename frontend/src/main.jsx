@@ -190,7 +190,7 @@ function App() {
       const payload = await readApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(payload.detail || "The approved SQL could not be executed.");
+        throw new Error(payload.detail || "The approved query could not be executed.");
       }
 
       setAnswer(payload);
@@ -304,11 +304,11 @@ function App() {
                         checked={requireApproval}
                         onChange={(event) => setRequireApproval(event.target.checked)}
                       />
-                      Review SQL before execute
+                      Review query before execute
                     </label>
                     <button className="run-button" type="submit" disabled={isLoading}>
                       {isLoading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
-                      {isLoading ? "Running" : requireApproval ? "Generate SQL" : "Run query"}
+                      {isLoading ? "Running" : requireApproval ? "Generate query" : "Run query"}
                     </button>
                   </div>
                 </div>
@@ -409,24 +409,24 @@ function StatusBadge({ status, corrected }) {
 
 function SqlPanel({ answer, onCopy, copied }) {
   const corrected = answer?.corrected_sql?.length > 0;
-  const sql = answer?.sql || answer?.original_sql || "SELECT ...";
+  const query = answer?.query || answer?.sql || answer?.original_query || answer?.original_sql || "SELECT ...";
 
   return (
     <section className="sql-workspace">
       <div className="panel-title">
         <h2>
           <Braces size={18} />
-          Generated SQL
+          Generated query
         </h2>
         <div className="panel-actions">
           <StatusBadge status={answer?.status} corrected={corrected} />
           <button type="button" className="text-action" onClick={onCopy} disabled={!answer}>
             <Clipboard size={15} />
-            {copied ? "Copied" : "Copy SQL"}
+            {copied ? "Copied" : "Copy query"}
           </button>
         </div>
       </div>
-      <pre className="sql-code">{sql}</pre>
+      <pre className="sql-code">{query}</pre>
       <div className="sql-meta">
         <span>Retries: {answer?.retry_count ?? 0}</span>
         <span>Rows: {answer?.row_count ?? 0}</span>
@@ -459,11 +459,11 @@ function FinalAnswerBand({ answer, isLoading }) {
 
 function getFinalAnswerMessage(answer, isLoading) {
   if (isLoading) {
-    return "Generating SQL, validating it, and checking the database.";
+    return "Generating a query, validating it, and checking the database.";
   }
 
   if (!answer) {
-    return "Ask a question to generate SQL, inspect the rows, and get a concise answer.";
+    return "Ask a question to generate a query, inspect the rows, and get a concise answer.";
   }
 
   return answer.final_answer || "The query completed, but no final answer was returned.";
@@ -479,7 +479,7 @@ function ApprovalPanel({ answer, isLoading, onApprove }) {
           <CheckCircle2 size={16} />
           Human approval required
         </span>
-        <p>Review the generated read-only SQL below, then approve it to execute against SQLite.</p>
+        <p>Review the generated read-only query below, then approve it to execute.</p>
       </div>
       <button className="approve-button" type="button" onClick={onApprove} disabled={isLoading}>
         {isLoading ? <Loader2 className="spin" size={18} /> : <CheckCircle2 size={18} />}
@@ -499,7 +499,7 @@ function InsightPanel({ answer }) {
           <Clipboard size={16} />
           Explanation
         </span>
-        <p>{answer?.explanation || "The SQL explanation will appear here."}</p>
+        <p>{answer?.explanation || "The query explanation will appear here."}</p>
       </article>
 
       <article className={`answer-card ${corrected ? "corrected" : ""}`}>
@@ -510,7 +510,7 @@ function InsightPanel({ answer }) {
         {corrected ? (
           <pre>{answer.corrected_sql.join("\n\n")}</pre>
         ) : (
-          <p>{answer ? "No correction was needed." : "Retries and repaired SQL will appear here."}</p>
+          <p>{answer ? "No correction was needed." : "Retries and repaired queries will appear here."}</p>
         )}
       </article>
     </section>
@@ -740,7 +740,7 @@ function TableDetailDrawer({ table, columns, onClose }) {
           Close
         </button>
       </div>
-      <p>{tableDescriptions[table] || "Database table available to the Text-to-SQL agent."}</p>
+      <p>{tableDescriptions[table] || "Database table available to the natural-language data agent."}</p>
       <div className="table-drawer-meta">
         <span>{columns.length} columns</span>
         <span>{relations.length} links</span>
