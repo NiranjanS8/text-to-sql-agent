@@ -4,7 +4,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from text_to_sql_agent.cache import get_cached_text
+from text_to_sql_agent.config import Settings, get_settings
 from text_to_sql_agent.database import format_schema_for_prompt, get_connection
+
+
+SCHEMA_RAG_VERSION = "2026-05-10"
 
 
 @dataclass(frozen=True)
@@ -136,7 +141,30 @@ BUSINESS_RULES: tuple[BusinessRule, ...] = (
 )
 
 
-def build_retrieved_schema_context(question: str, database_path: Path | None = None, limit: int = 5) -> str:
+def build_retrieved_schema_context(
+    question: str,
+    database_path: Path | None = None,
+    limit: int = 5,
+    settings: Settings | None = None,
+) -> str:
+    active_settings = settings or get_settings()
+    path = database_path or active_settings.database_path
+    payload = {
+        "question": question,
+        "limit": limit,
+        "database": _database_fingerprint(path),
+        "rag_version": SCHEMA_RAG_VERSION,
+        "business_rules": [rule.id for rule in BUSINESS_RULES],
+    }
+    return get_cached_text(
+        "schema-context",
+        payload,
+        lambda: _build_retrieved_schema_context(question, path, limit),
+        settings=active_settings,
+    )
+
+
+def _build_retrieved_schema_context(question: str, database_path: Path | None = None, limit: int = 5) -> str:
     schema = format_schema_for_prompt(database_path)
     rules = retrieve_business_rules(question, limit=limit)
     values = retrieve_relevant_values(question, database_path)
@@ -224,3 +252,15 @@ def _count_rows(table: str, database_path: Path | None) -> int:
     except sqlite3.Error:
         return 0
     return int(row["count"] if row else 0)
+
+
+def _database_fingerprint(database_path: Path | None) -> dict[str, object]:
+    if database_path is None:
+        return {"path": None, "mtime_ns": None, "size": None}
+
+    path = database_path.resolve()
+    try:
+        stat = path.stat()
+    except OSError:
+        return {"path": str(path), "mtime_ns": None, "size": None}
+    return {"path": str(path), "mtime_ns": stat.st_mtime_ns, "size": stat.st_size}

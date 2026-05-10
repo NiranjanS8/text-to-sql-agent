@@ -1,4 +1,10 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
   text-to-sql-agent:
     build: .
     ports:
@@ -8,9 +14,14 @@ services:
       LOG_LEVEL: INFO
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-large-latest}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-900}
     volumes:
       - text_to_sql_data:/app/data
+    depends_on:
+      - redis
     restart: unless-stopped
 
 volumes:
   text_to_sql_data:
+  redis_data:

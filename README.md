@@ -56,6 +56,35 @@ SQL generation and correction use a lightweight retrieval layer over schema note
 
 This keeps prompts grounded in domain knowledge while preserving a simple local setup.
 
+## Redis Caching
+
+The backend supports optional Redis-backed caching for expensive read paths:
+
+- retrieved schema/RAG context
+- generated SQL for repeated questions
+- corrected SQL for repeated repair attempts
+
+Cache keys include the question, model, prompt/cache version, schema context, and database fingerprint where relevant, so prompt or data changes do not silently reuse old SQL. If `REDIS_URL` is missing or Redis is unavailable, the app falls back to uncached execution.
+
+Local Docker Compose starts Redis automatically:
+
+```bash
+docker compose up --build
+```
+
+For non-Docker runs, configure:
+
+```bash
+REDIS_URL=redis://localhost:6379/0
+CACHE_TTL_SECONDS=900
+```
+
+Cache health is available at:
+
+```text
+GET /cache/health
+```
+
 ## Human Approval Mode
 
 The API and React UI support a human-in-the-loop execution path for safer agentic workflows.

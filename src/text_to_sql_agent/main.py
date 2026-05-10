@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from text_to_sql_agent.agent_workflow import execute_approved_sql, prepare_sql_for_approval, run_agent_pipeline
+from text_to_sql_agent.cache import redis_health
 from text_to_sql_agent.config import get_settings
 from text_to_sql_agent.database import get_schema, initialize_database
 from text_to_sql_agent.history import list_query_history, save_query_history
@@ -95,6 +96,10 @@ def create_app() -> FastAPI:
             if _is_rate_limit_error(exc):
                 return {"status": "rate_limited", "message": RATE_LIMIT_MESSAGE}
             raise
+
+    @app.get("/cache/health", tags=["system"])
+    def cache_health() -> dict[str, str]:
+        return redis_health(settings)
 
     return app
 

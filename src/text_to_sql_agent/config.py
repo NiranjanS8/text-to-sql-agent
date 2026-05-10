@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     mistral_model: str = Field(default="mistral-large-latest", alias="MISTRAL_MODEL")
     database_url: str = Field(default="sqlite:///data/text_to_sql.db", alias="DATABASE_URL")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    redis_url: str | None = Field(default=None, alias="REDIS_URL")
+    cache_ttl_seconds: int = Field(default=900, ge=1, alias="CACHE_TTL_SECONDS")
 
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", extra="ignore")
 
@@ -29,4 +31,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
