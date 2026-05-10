@@ -63,8 +63,11 @@ The backend supports optional Redis-backed caching for expensive read paths:
 - retrieved schema/RAG context
 - generated SQL for repeated questions
 - corrected SQL for repeated repair attempts
+- semantic SQL reuse for paraphrased questions
 
 Cache keys include the question, model, prompt/cache version, schema context, and database fingerprint where relevant, so prompt or data changes do not silently reuse old SQL. If `REDIS_URL` is missing or Redis is unavailable, the app falls back to uncached execution.
+
+Semantic caching is conservative: it reuses generated SQL only when a normalized question vector is above `SEMANTIC_CACHE_THRESHOLD` in the same model, prompt, and database namespace. Reused SQL still goes through validation, semantic guardrails, approval mode, and execution policy.
 
 Local Docker Compose starts Redis automatically:
 
@@ -77,6 +80,9 @@ For non-Docker runs, configure:
 ```bash
 REDIS_URL=redis://localhost:6379/0
 CACHE_TTL_SECONDS=900
+ENABLE_SEMANTIC_CACHE=true
+SEMANTIC_CACHE_THRESHOLD=0.92
+SEMANTIC_CACHE_MAX_ENTRIES=200
 ```
 
 Cache health is available at:

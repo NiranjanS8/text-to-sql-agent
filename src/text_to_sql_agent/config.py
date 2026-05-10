@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     cache_ttl_seconds: int = Field(default=900, ge=1, alias="CACHE_TTL_SECONDS")
+    enable_semantic_cache: bool = Field(default=True, alias="ENABLE_SEMANTIC_CACHE")
+    semantic_cache_threshold: float = Field(default=0.92, ge=0.0, le=1.0, alias="SEMANTIC_CACHE_THRESHOLD")
+    semantic_cache_max_entries: int = Field(default=200, ge=1, alias="SEMANTIC_CACHE_MAX_ENTRIES")
 
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", extra="ignore")
 

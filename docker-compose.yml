@@ -16,6 +16,9 @@ services:
       MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-large-latest}
       REDIS_URL: redis://redis:6379/0
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-900}
+      ENABLE_SEMANTIC_CACHE: ${ENABLE_SEMANTIC_CACHE:-true}
+      SEMANTIC_CACHE_THRESHOLD: ${SEMANTIC_CACHE_THRESHOLD:-0.92}
+      SEMANTIC_CACHE_MAX_ENTRIES: ${SEMANTIC_CACHE_MAX_ENTRIES:-200}
     volumes:
       - text_to_sql_data:/app/data
     depends_on:

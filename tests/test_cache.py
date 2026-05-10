@@ -4,6 +4,7 @@ from text_to_sql_agent.cache import build_cache_key, get_cached_text, redis_heal
 from text_to_sql_agent.config import Settings
 from text_to_sql_agent.database import initialize_database
 from text_to_sql_agent.schema_rag import build_retrieved_schema_context
+from text_to_sql_agent.semantic_cache import lookup_semantic_sql, store_semantic_sql
 from text_to_sql_agent.sql_generator import correct_sql, generate_sql
 
 
@@ -118,4 +119,76 @@ def test_correct_sql_uses_redis_cache(tmp_path: Path, monkeypatch) -> None:
     assert correct_sql("Show names", "SELECT missing FROM students;", "no such column", settings=settings) == (
         "SELECT name FROM students ORDER BY id;"
     )
+    assert calls == 1
+
+
+def test_semantic_cache_reuses_similar_question(monkeypatch) -> None:
+    redis = FakeRedis()
+    settings = Settings(
+        REDIS_URL="redis://cache:6379/0",
+        ENABLE_SEMANTIC_CACHE=True,
+        SEMANTIC_CACHE_THRESHOLD=0.9,
+    )
+    namespace = {"schema": "invoices(...)", "model": "test-model", "prompt_version": "test"}
+
+    monkeypatch.setattr("text_to_sql_agent.cache.get_redis_client", lambda redis_url: redis)
+
+    store_semantic_sql(
+        "Which customers have overdue invoice balance?",
+        "SELECT name FROM organizations;",
+        namespace,
+        settings,
+    )
+
+    assert lookup_semantic_sql("Show overdue invoice balances by customer", namespace, settings) == (
+        "SELECT name FROM organizations;"
+    )
+
+
+def test_semantic_cache_respects_threshold(monkeypatch) -> None:
+    redis = FakeRedis()
+    settings = Settings(
+        REDIS_URL="redis://cache:6379/0",
+        ENABLE_SEMANTIC_CACHE=True,
+        SEMANTIC_CACHE_THRESHOLD=0.99,
+    )
+    namespace = {"schema": "invoices(...)", "model": "test-model", "prompt_version": "test"}
+
+    monkeypatch.setattr("text_to_sql_agent.cache.get_redis_client", lambda redis_url: redis)
+
+    store_semantic_sql(
+        "Which customers have overdue invoice balance?",
+        "SELECT name FROM organizations;",
+        namespace,
+        settings,
+    )
+
+    assert lookup_semantic_sql("List support ticket priorities", namespace, settings) is None
+
+
+def test_generate_sql_uses_semantic_cache_for_similar_questions(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "sample.db"
+    initialize_database(database_path)
+    redis = FakeRedis()
+    settings = Settings(
+        DATABASE_URL=f"sqlite:///{database_path}",
+        REDIS_URL="redis://cache:6379/0",
+        ENABLE_SEMANTIC_CACHE=True,
+        SEMANTIC_CACHE_THRESHOLD=0.9,
+    )
+    calls = 0
+
+    monkeypatch.setattr("text_to_sql_agent.cache.get_redis_client", lambda redis_url: redis)
+
+    def fake_generate_uncached(question: str, schema: str, settings: Settings) -> str:
+        nonlocal calls
+        calls += 1
+        return "SELECT organizations.name FROM organizations JOIN invoices ON invoices.id = invoices.id;"
+
+    monkeypatch.setattr("text_to_sql_agent.sql_generator._generate_sql_uncached", fake_generate_uncached)
+
+    first = generate_sql("Which customers have overdue invoice balance?", settings=settings)
+    second = generate_sql("Show overdue invoice balances by customer", settings=settings)
+
+    assert first == second
     assert calls == 1
