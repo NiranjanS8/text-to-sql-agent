@@ -28,6 +28,8 @@ def test_schema_endpoint_returns_sample_tables() -> None:
     assert response.status_code == 200
     tables = response.json()["tables"]
     assert {"students", "courses", "enrollments", "payments"}.issubset(tables.keys())
+    assert "query_history" not in tables
+    assert "sql_approvals" not in tables
     assert {
         "organizations",
         "app_users",
@@ -99,20 +101,56 @@ def test_ask_endpoint_can_prepare_sql_for_approval(monkeypatch) -> None:
     assert payload["row_count"] == 0
     assert payload["data"] == []
     assert payload["sql"] == "SELECT name FROM students ORDER BY id;"
+    assert payload["approval_id"]
+    assert payload["approval_expires_at"]
     assert payload["final_answer"] == "SQL is ready for human approval before execution."
 
 
-def test_approve_endpoint_executes_reviewed_sql() -> None:
-    response = client.post(
-        "/approve",
-        json={"question": "Show all student names", "sql": "SELECT name FROM students ORDER BY id;"},
+def test_approve_endpoint_executes_prepared_approval(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name FROM students ORDER BY id;",
     )
+    prepare_response = client.post(
+        "/ask",
+        json={"question": "Show all student names", "require_approval": True},
+    )
+    approval_id = prepare_response.json()["approval_id"]
+
+    response = client.post("/approve", json={"approval_id": approval_id})
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["approval_id"] == approval_id
     assert payload["status"] == "success"
     assert payload["row_count"] == 10
     assert payload["data"][0] == {"name": "Aarav Sharma"}
+
+
+def test_approve_endpoint_rejects_missing_approval_record() -> None:
+    response = client.post("/approve", json={"approval_id": "missing"})
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Approval record was not found."}
+
+
+def test_approve_endpoint_rejects_reused_approval(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "text_to_sql_agent.agent_workflow.generate_sql",
+        lambda question, settings=None: "SELECT name FROM students ORDER BY id;",
+    )
+    prepare_response = client.post(
+        "/ask",
+        json={"question": "Show all student names", "require_approval": True},
+    )
+    approval_id = prepare_response.json()["approval_id"]
+
+    first_response = client.post("/approve", json={"approval_id": approval_id})
+    second_response = client.post("/approve", json={"approval_id": approval_id})
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 400
+    assert second_response.json() == {"detail": "Approval record has already been used."}
 
 
 def test_ask_endpoint_returns_validation_error_for_unsafe_generated_sql(monkeypatch) -> None:

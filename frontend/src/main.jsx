@@ -176,7 +176,7 @@ function App() {
   }
 
   async function approveSql() {
-    if (!answer?.sql || !answer?.question) return;
+    if (!answer?.approval_id) return;
 
     setIsLoading(true);
     setError("");
@@ -185,7 +185,7 @@ function App() {
       const response = await fetch("/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: answer.question, sql: answer.sql }),
+        body: JSON.stringify({ approval_id: answer.approval_id }),
       });
       const payload = await readApiResponse(response);
 

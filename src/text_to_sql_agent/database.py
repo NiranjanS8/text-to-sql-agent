@@ -7,6 +7,9 @@ from typing import Any
 from text_to_sql_agent.config import get_settings
 
 
+INTERNAL_TABLES = {"query_history", "sql_approvals"}
+
+
 SAMPLE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,6 +153,17 @@ CREATE TABLE IF NOT EXISTS query_history (
     execution_status TEXT NOT NULL,
     error_message TEXT,
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sql_approvals (
+    id TEXT PRIMARY KEY,
+    question TEXT NOT NULL,
+    sql TEXT NOT NULL,
+    sql_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    approved_at TEXT
 );
 """
 
@@ -402,10 +416,12 @@ def get_table_names(database_path: Path | None = None) -> list[str]:
     return [row["name"] for row in rows]
 
 
-def get_schema(database_path: Path | None = None) -> dict[str, list[dict[str, Any]]]:
+def get_schema(database_path: Path | None = None, include_internal: bool = False) -> dict[str, list[dict[str, Any]]]:
     schema: dict[str, list[dict[str, Any]]] = {}
     with get_connection(database_path) as connection:
         for table in get_table_names(database_path):
+            if not include_internal and table in INTERNAL_TABLES:
+                continue
             columns = connection.execute(f"PRAGMA table_info({table})").fetchall()
             schema[table] = [
                 {
@@ -419,8 +435,8 @@ def get_schema(database_path: Path | None = None) -> dict[str, list[dict[str, An
     return schema
 
 
-def format_schema_for_prompt(database_path: Path | None = None) -> str:
-    schema = get_schema(database_path)
+def format_schema_for_prompt(database_path: Path | None = None, include_internal: bool = False) -> str:
+    schema = get_schema(database_path, include_internal=include_internal)
     lines: list[str] = []
     for table, columns in schema.items():
         column_text = ", ".join(f"{column['name']} {column['type']}" for column in columns)

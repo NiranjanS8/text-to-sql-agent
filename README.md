@@ -90,8 +90,10 @@ GET /cache/health
 The API and React UI support a human-in-the-loop execution path for safer agentic workflows.
 
 - Normal mode: `/ask` generates, validates, executes, and formats the answer.
-- Approval mode: `/ask` with `require_approval: true` generates and validates SQL, then returns `awaiting_approval` without executing.
-- Approval execution: `/approve` validates the reviewed SQL again, executes it, saves history, and returns the final answer.
+- Approval mode: `/ask` with `require_approval: true` generates and validates SQL, stores a short-lived approval record, then returns `awaiting_approval` plus an `approval_id` without executing.
+- Approval execution: `/approve` consumes the pending `approval_id`, validates the stored SQL again, executes it once, saves history, and returns the final answer.
+
+Approval records include an integrity hash and expiry timestamp. `/approve` does not accept arbitrary SQL, so approval mode acts like a bounded workflow instead of a second SQL execution endpoint.
 
 This demonstrates bounded tool use and human review before database actions.
 
@@ -118,6 +120,17 @@ The agent applies semantic checks after SQL validation and before database execu
 - preserves existing empty-result recovery for impossible thresholds, unknown courses, unknown cities, and out-of-range dates
 
 This gives the project a stronger applied-AI safety story: query execution is bounded not only by syntax, but also by domain intent.
+
+## SQL Policy
+
+SQL validation enforces a conservative read-only policy before execution:
+
+- exactly one `SELECT` statement
+- no write/DDL keywords
+- no SQL comments
+- no unsafe SQLite file/extension functions
+- only public domain tables are queryable
+- internal tables such as query history and SQL approvals are hidden from schema prompts and `/schema`
 
 ## Docker Deployment
 

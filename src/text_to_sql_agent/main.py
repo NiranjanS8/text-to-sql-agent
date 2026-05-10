@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from text_to_sql_agent.agent_workflow import execute_approved_sql, prepare_sql_for_approval, run_agent_pipeline
+from text_to_sql_agent.approvals import ApprovalError, consume_sql_approval, create_sql_approval
 from text_to_sql_agent.cache import redis_health
 from text_to_sql_agent.config import get_settings
 from text_to_sql_agent.database import get_schema, initialize_database
@@ -27,8 +28,7 @@ class AskRequest(BaseModel):
 
 
 class ApproveRequest(BaseModel):
-    question: str = Field(..., min_length=1)
-    sql: str = Field(..., min_length=1)
+    approval_id: str = Field(..., min_length=1)
 
 
 def create_app() -> FastAPI:
@@ -76,15 +76,32 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=429, detail=RATE_LIMIT_MESSAGE) from exc
             raise
 
-        if workflow.execution.status != "awaiting_approval":
+        response = workflow.to_dict()
+        if workflow.execution.status == "awaiting_approval":
+            approval = create_sql_approval(
+                question=workflow.question,
+                sql=workflow.execution.sql,
+                database_path=settings.database_path,
+            )
+            response["approval_id"] = approval.id
+            response["approval_expires_at"] = approval.expires_at
+        else:
             save_query_history(workflow, database_path=settings.database_path)
-        return workflow.to_dict()
+        return response
 
     @app.post("/approve", tags=["agent"])
     def approve(request: ApproveRequest) -> dict[str, object]:
-        workflow = execute_approved_sql(request.question, request.sql, settings=settings)
+        try:
+            approval = consume_sql_approval(request.approval_id, database_path=settings.database_path)
+        except ApprovalError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        workflow = execute_approved_sql(approval.question, approval.sql, settings=settings)
         save_query_history(workflow, database_path=settings.database_path)
-        return workflow.to_dict()
+        response = workflow.to_dict()
+        response["approval_id"] = approval.id
+        response["approved_at"] = approval.approved_at
+        return response
 
     @app.get("/mistral/health", tags=["system"])
     def mistral_health() -> dict[str, str]:

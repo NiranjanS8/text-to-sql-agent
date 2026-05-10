@@ -3,6 +3,23 @@ from dataclasses import dataclass
 
 
 BLOCKED_SQL_KEYWORDS = ("DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "REPLACE", "TRUNCATE")
+ALLOWED_TABLES = {
+    "app_users",
+    "courses",
+    "enrollments",
+    "feature_adoption",
+    "feature_flags",
+    "invoices",
+    "organizations",
+    "payments",
+    "plans",
+    "students",
+    "subscriptions",
+    "support_tickets",
+    "usage_events",
+}
+BLOCKED_TABLES = {"query_history", "sql_approvals", "sqlite_master", "sqlite_schema", "sqlite_sequence"}
+BLOCKED_FUNCTIONS = ("load_extension", "readfile", "writefile")
 
 
 class SQLValidationError(ValueError):
@@ -49,6 +66,21 @@ def validate_sql(sql: str) -> ValidationResult:
             error=f"Unsafe SQL keyword blocked: {blocked_keyword}.",
         )
 
+    if _contains_comment(cleaned):
+        return ValidationResult(sql=cleaned, is_safe=False, error="SQL comments are not allowed.")
+
+    blocked_function = _find_blocked_function(cleaned)
+    if blocked_function:
+        return ValidationResult(
+            sql=cleaned,
+            is_safe=False,
+            error=f"Unsafe SQL function blocked: {blocked_function}.",
+        )
+
+    table_error = _validate_table_policy(cleaned)
+    if table_error:
+        return ValidationResult(sql=cleaned, is_safe=False, error=table_error)
+
     return ValidationResult(sql=_ensure_trailing_semicolon(cleaned), is_safe=True)
 
 
@@ -71,6 +103,39 @@ def _find_blocked_keyword(sql: str) -> str | None:
     return None
 
 
+def _contains_comment(sql: str) -> bool:
+    return "--" in sql or "/*" in sql or "*/" in sql
+
+
+def _find_blocked_function(sql: str) -> str | None:
+    for function_name in BLOCKED_FUNCTIONS:
+        if re.search(rf"\b{function_name}\s*\(", sql, flags=re.IGNORECASE):
+            return function_name
+    return None
+
+
+def _validate_table_policy(sql: str) -> str | None:
+    tables = _extract_referenced_tables(sql)
+    if not tables:
+        return None
+
+    for table in tables:
+        normalized = table.lower()
+        if normalized in BLOCKED_TABLES or normalized.startswith("sqlite_"):
+            return f"Table is not queryable by this agent: {table}."
+        if normalized not in ALLOWED_TABLES:
+            return f"Unknown or disallowed table referenced: {table}."
+    return None
+
+
+def _extract_referenced_tables(sql: str) -> list[str]:
+    matches = re.findall(
+        r"\b(?:FROM|JOIN)\s+([A-Za-z_][\w.]*)(?:\s+(?:AS\s+)?[A-Za-z_][\w]*)?",
+        sql,
+        flags=re.IGNORECASE,
+    )
+    return [match.split(".")[-1] for match in matches]
+
+
 def _ensure_trailing_semicolon(sql: str) -> str:
     return sql if sql.endswith(";") else f"{sql};"
-
