@@ -1,10 +1,10 @@
 ﻿# Text-to-SQL Agent
 
-FastAPI backend for asking natural-language questions over a SQLite database using LangChain and Mistral.
+FastAPI backend for asking natural-language questions over SQLite or PostgreSQL using LangChain and Mistral.
 
 ## Sample Domain
 
-The SQLite database includes both the original education domain and a richer SaaS analytics domain. The SaaS schema supports resume-grade Text-to-SQL questions across:
+The sample database includes both the original education domain and a richer SaaS analytics domain. The SaaS schema supports resume-grade Text-to-SQL questions across:
 
 - organizations, lifecycle stages, industries, regions, and employee counts
 - app users, roles, activity, and account ownership
@@ -45,7 +45,7 @@ Default cases cover joins, aggregations, partial payments, top-N queries, empty-
 
 ## Schema RAG
 
-SQL generation and correction use a lightweight retrieval layer over schema notes, business rules, and live database values. The agent receives the full SQLite schema plus only the most relevant guidance for the question, such as:
+SQL generation and correction use a lightweight retrieval layer over schema notes, business rules, and live database values. The agent receives the full active database schema plus only the most relevant guidance for the question, such as:
 
 - course title matching with `LIKE`
 - student enrollment joins
@@ -158,5 +158,27 @@ The app will be available at:
 http://localhost:8000
 ```
 
-The container builds the React frontend, installs the FastAPI package, initializes SQLite on startup, and persists database state in the `text_to_sql_data` Docker volume.
+The container builds the React frontend, installs the FastAPI package, initializes the configured database on startup, and persists local SQLite state in the `text_to_sql_data` Docker volume.
+
+## Database Backends
+
+SQLite remains the default backend:
+
+```bash
+DATABASE_URL=sqlite:///data/text_to_sql.db
+```
+
+PostgreSQL is also supported for the same SQL agent workflow:
+
+```bash
+DATABASE_URL=postgresql://text_to_sql:text_to_sql@localhost:5432/text_to_sql
+```
+
+The backend detects the dialect from `DATABASE_URL`, initializes the sample schema, introspects public tables, and passes the active dialect into SQL generation and correction prompts. The SQL validator, approval workflow, Redis exact cache, and semantic cache remain shared across SQLite and PostgreSQL.
+
+Docker Compose includes a local Postgres service. To run against it, set `DATABASE_URL` in `.env` to:
+
+```bash
+DATABASE_URL=postgresql://text_to_sql:text_to_sql@postgres:5432/text_to_sql
+```
 

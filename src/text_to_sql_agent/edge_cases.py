@@ -525,7 +525,12 @@ def _distinct_values(table: str, column: str, database_path: Path | None) -> lis
 
 def _scalar(sql: str, database_path: Path | None) -> Any:
     with get_connection(database_path) as connection:
-        return connection.execute(sql).fetchone()[0]
+        row = connection.execute(sql).fetchone()
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return next(iter(row.values()))
+    return row[0]
 
 
 def _clean_phrase(value: str) -> str:

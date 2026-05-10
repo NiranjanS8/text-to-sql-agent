@@ -137,7 +137,7 @@ def evaluate_agent(
     settings: Settings | None = None,
 ) -> EvaluationSummary:
     active_settings = settings or get_settings()
-    initialize_database(active_settings.database_path)
+    initialize_database(active_settings.database_source)
 
     runner = pipeline or (lambda question: run_agent_pipeline(question, settings=active_settings))
     case_results = [_evaluate_case(case, runner) for case in cases]

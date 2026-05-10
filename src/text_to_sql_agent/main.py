@@ -34,7 +34,7 @@ class ApproveRequest(BaseModel):
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
-    initialize_database(settings.database_path)
+    initialize_database(settings.database_source)
     static_dir = Path(__file__).resolve().parents[2] / "static"
     react_index = static_dir / "react" / "index.html"
 
@@ -55,11 +55,11 @@ def create_app() -> FastAPI:
 
     @app.get("/schema", tags=["database"])
     def schema() -> dict[str, object]:
-        return {"tables": get_schema(settings.database_path)}
+        return {"dialect": settings.database_dialect, "tables": get_schema(settings.database_source)}
 
     @app.get("/history", tags=["agent"])
     def history(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, object]:
-        records = list_query_history(limit=limit, database_path=settings.database_path)
+        records = list_query_history(limit=limit, database_path=settings.database_source)
         return {"history": [record.to_dict() for record in records]}
 
     @app.post("/ask", tags=["agent"])
@@ -81,23 +81,23 @@ def create_app() -> FastAPI:
             approval = create_sql_approval(
                 question=workflow.question,
                 sql=workflow.execution.sql,
-                database_path=settings.database_path,
+                database_path=settings.database_source,
             )
             response["approval_id"] = approval.id
             response["approval_expires_at"] = approval.expires_at
         else:
-            save_query_history(workflow, database_path=settings.database_path)
+            save_query_history(workflow, database_path=settings.database_source)
         return response
 
     @app.post("/approve", tags=["agent"])
     def approve(request: ApproveRequest) -> dict[str, object]:
         try:
-            approval = consume_sql_approval(request.approval_id, database_path=settings.database_path)
+            approval = consume_sql_approval(request.approval_id, database_path=settings.database_source)
         except ApprovalError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         workflow = execute_approved_sql(approval.question, approval.sql, settings=settings)
-        save_query_history(workflow, database_path=settings.database_path)
+        save_query_history(workflow, database_path=settings.database_source)
         response = workflow.to_dict()
         response["approval_id"] = approval.id
         response["approved_at"] = approval.approved_at

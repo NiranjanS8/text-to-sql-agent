@@ -18,9 +18,10 @@ def cleanup_generated_sql(sql: str) -> str:
 
 def generate_sql(question: str, settings: Settings | None = None) -> str:
     active_settings = settings or get_settings()
-    schema = build_retrieved_schema_context(question, active_settings.database_path, settings=active_settings)
+    schema = build_retrieved_schema_context(question, active_settings.database_source, settings=active_settings)
     semantic_namespace = {
-        "database": _database_fingerprint(active_settings.database_path),
+        "database": _database_fingerprint(active_settings.database_source),
+        "dialect": active_settings.database_dialect,
         "model": active_settings.mistral_model,
         "prompt_version": SQL_GENERATION_CACHE_VERSION,
         "prompt": str(SQL_GENERATION_PROMPT),
@@ -52,13 +53,13 @@ def _generate_sql_with_semantic_cache(
 def _generate_sql_uncached(question: str, schema: str, settings: Settings) -> str:
     chat = create_mistral_chat(settings)
     chain = SQL_GENERATION_PROMPT | chat | StrOutputParser()
-    sql = chain.invoke({"schema": schema, "question": question})
+    sql = chain.invoke({"dialect": settings.database_dialect, "schema": schema, "question": question})
     return cleanup_generated_sql(sql)
 
 
 def correct_sql(question: str, failed_sql: str, error: str, settings: Settings | None = None) -> str:
     active_settings = settings or get_settings()
-    schema = build_retrieved_schema_context(question, active_settings.database_path, settings=active_settings)
+    schema = build_retrieved_schema_context(question, active_settings.database_source, settings=active_settings)
     payload = {
         "question": question,
         "schema": schema,
@@ -81,6 +82,7 @@ def _correct_sql_uncached(question: str, failed_sql: str, error: str, schema: st
     chain = SQL_CORRECTION_PROMPT | chat | StrOutputParser()
     sql = chain.invoke(
         {
+            "dialect": settings.database_dialect,
             "schema": schema,
             "question": question,
             "failed_sql": failed_sql,
@@ -91,6 +93,8 @@ def _correct_sql_uncached(question: str, failed_sql: str, error: str, schema: st
 
 
 def _database_fingerprint(database_path: object) -> dict[str, object]:
+    if isinstance(database_path, str):
+        return {"source": database_path, "mtime_ns": None, "size": None}
     try:
         path = database_path.resolve()
         stat = path.stat()

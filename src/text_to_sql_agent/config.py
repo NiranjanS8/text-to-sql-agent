@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -29,6 +30,20 @@ class Settings(BaseSettings):
             raise ValueError("Only sqlite:/// DATABASE_URL values are supported.")
         path = self.database_url.replace("sqlite:///", "", 1)
         return (ROOT_DIR / path).resolve()
+
+    @property
+    def database_dialect(self) -> Literal["sqlite", "postgresql"]:
+        if self.database_url.startswith("sqlite:///"):
+            return "sqlite"
+        if self.database_url.startswith(("postgresql://", "postgres://")):
+            return "postgresql"
+        raise ValueError("DATABASE_URL must start with sqlite:///, postgresql://, or postgres://.")
+
+    @property
+    def database_source(self) -> Path | str:
+        if self.database_dialect == "sqlite":
+            return self.database_path
+        return self.database_url
 
 
 @lru_cache

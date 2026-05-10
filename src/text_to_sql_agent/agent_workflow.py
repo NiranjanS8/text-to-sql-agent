@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from langchain_core.tools import StructuredTool
@@ -42,7 +41,7 @@ class AgentWorkflowResult:
         return response
 
 
-def create_schema_context_tool(database_path: Path | None = None) -> StructuredTool:
+def create_schema_context_tool(database_path: object | None = None) -> StructuredTool:
     def get_schema_context() -> str:
         return format_schema_for_prompt(database_path)
 
@@ -74,7 +73,7 @@ def create_sql_validation_tool() -> StructuredTool:
     )
 
 
-def create_sql_execution_tool(database_path: Path | None = None) -> StructuredTool:
+def create_sql_execution_tool(database_path: object | None = None) -> StructuredTool:
     def execute(question: str, sql: str) -> QueryExecutionResult:
         return execute_sql(question=question, sql=sql, database_path=database_path)
 
@@ -116,7 +115,7 @@ def create_final_answer_tool() -> StructuredTool:
 
 def prepare_sql_for_approval(question: str, settings: Settings | None = None) -> AgentWorkflowResult:
     active_settings = settings or get_settings()
-    database_path = active_settings.database_path
+    database_path = active_settings.database_source
 
     generation_tool = create_sql_generation_tool(active_settings)
     validation_tool = create_sql_validation_tool()
@@ -154,7 +153,7 @@ def prepare_sql_for_approval(question: str, settings: Settings | None = None) ->
 
 def execute_approved_sql(question: str, sql: str, settings: Settings | None = None) -> AgentWorkflowResult:
     active_settings = settings or get_settings()
-    database_path = active_settings.database_path
+    database_path = active_settings.database_source
 
     validation_tool = create_sql_validation_tool()
     execution_tool = create_sql_execution_tool(database_path)
@@ -205,7 +204,7 @@ def run_agent_pipeline(
     max_empty_result_retries: int = 1,
 ) -> AgentWorkflowResult:
     active_settings = settings or get_settings()
-    database_path = active_settings.database_path
+    database_path = active_settings.database_source
 
     generation_tool = create_sql_generation_tool(active_settings)
     validation_tool = create_sql_validation_tool()

@@ -1,4 +1,3 @@
-import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -32,7 +31,7 @@ class QueryExecutionResult:
         return response
 
 
-def execute_sql(question: str, sql: str, database_path: Path | None = None) -> QueryExecutionResult:
+def execute_sql(question: str, sql: str, database_path: Path | str | None = None) -> QueryExecutionResult:
     validation = validate_sql(sql)
     if not validation.is_safe:
         return QueryExecutionResult(
@@ -45,7 +44,7 @@ def execute_sql(question: str, sql: str, database_path: Path | None = None) -> Q
     try:
         with get_connection(database_path) as connection:
             rows = connection.execute(validation.sql).fetchall()
-    except sqlite3.Error as exc:
+    except Exception as exc:
         return QueryExecutionResult(
             question=question,
             sql=validation.sql,
@@ -63,6 +62,7 @@ def execute_sql(question: str, sql: str, database_path: Path | None = None) -> Q
     )
 
 
-def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+def _row_to_dict(row: Any) -> dict[str, Any]:
+    if isinstance(row, dict):
+        return dict(row)
     return {key: row[key] for key in row.keys()}
-

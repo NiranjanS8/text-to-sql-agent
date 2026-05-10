@@ -143,12 +143,12 @@ BUSINESS_RULES: tuple[BusinessRule, ...] = (
 
 def build_retrieved_schema_context(
     question: str,
-    database_path: Path | None = None,
+    database_path: Path | str | None = None,
     limit: int = 5,
     settings: Settings | None = None,
 ) -> str:
     active_settings = settings or get_settings()
-    path = database_path or active_settings.database_path
+    path = database_path or active_settings.database_source
     payload = {
         "question": question,
         "limit": limit,
@@ -164,7 +164,7 @@ def build_retrieved_schema_context(
     )
 
 
-def _build_retrieved_schema_context(question: str, database_path: Path | None = None, limit: int = 5) -> str:
+def _build_retrieved_schema_context(question: str, database_path: Path | str | None = None, limit: int = 5) -> str:
     schema = format_schema_for_prompt(database_path)
     rules = retrieve_business_rules(question, limit=limit)
     values = retrieve_relevant_values(question, database_path)
@@ -192,7 +192,7 @@ def retrieve_business_rules(question: str, limit: int = 5) -> list[BusinessRule]
     ][:limit]
 
 
-def retrieve_relevant_values(question: str, database_path: Path | None = None) -> list[str]:
+def retrieve_relevant_values(question: str, database_path: Path | str | None = None) -> list[str]:
     tokens = _tokenize(question)
     values: list[str] = []
 
@@ -234,29 +234,31 @@ def _score_rule(tokens: set[str], rule: BusinessRule) -> int:
     return len(tokens.intersection(rule.keywords))
 
 
-def _distinct_values(table: str, column: str, database_path: Path | None) -> Sequence[str]:
+def _distinct_values(table: str, column: str, database_path: Path | str | None) -> Sequence[str]:
     try:
         with get_connection(database_path) as connection:
             rows = connection.execute(
                 f"SELECT DISTINCT {column} AS value FROM {table} ORDER BY {column};"
             ).fetchall()
-    except sqlite3.Error:
+    except Exception:
         return ()
     return tuple(str(row["value"]) for row in rows)
 
 
-def _count_rows(table: str, database_path: Path | None) -> int:
+def _count_rows(table: str, database_path: Path | str | None) -> int:
     try:
         with get_connection(database_path) as connection:
             row = connection.execute(f"SELECT COUNT(*) AS count FROM {table};").fetchone()
-    except sqlite3.Error:
+    except Exception:
         return 0
     return int(row["count"] if row else 0)
 
 
-def _database_fingerprint(database_path: Path | None) -> dict[str, object]:
+def _database_fingerprint(database_path: Path | str | None) -> dict[str, object]:
     if database_path is None:
         return {"path": None, "mtime_ns": None, "size": None}
+    if isinstance(database_path, str):
+        return {"source": database_path, "mtime_ns": None, "size": None}
 
     path = database_path.resolve()
     try:
